@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3DA9F0">
+<title>สวนสัตว์แม่เกย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;500;600;700&family=Sarabun:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: เกมเต็มจอ ฉากสวนสัตว์แบบทุ่งหญ้า แถบสถานะลอยบางๆ ด้านบน 3 ชิ้น (หยุด · เวลา · คะแนน) */
+:root{
+  --leaf:#22A35A; --leaf-d:#17783F; --leaf-l:#E4F4EA;
+  --clay:#F06A2C; --sun:#FFC22E; --sky:#2E9BEA;
+  --ink:#2E2116; --muted:#7A6655; --paper:#FFFDF7; --line:#ECE2D0; --sand:#FFF1D6;
+  --good:#23965A; --bad:#D6454B;
+  --ui:'Mali',system-ui,sans-serif; --word:'Sarabun',Tahoma,system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#3FA34E;font-family:var(--ui);color:var(--ink);
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;overscroll-behavior:none;touch-action:manipulation}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;touch-action:manipulation}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.ico{width:1.2em;height:1.2em;vertical-align:-.25em;display:inline-block;flex:0 0 auto;overflow:visible}
+
+#app{height:100%;display:flex;justify-content:center;background:radial-gradient(120% 90% at 50% 0%,#7FD86A,#3FA34E)}
+#stage{position:relative;width:100%;max-width:1280px;height:100%;overflow:hidden;background:#8DD3FA}
+@media (min-width:900px){ #stage{height:calc(100% - 24px);margin-top:12px;border-radius:24px;box-shadow:0 0 0 4px rgba(255,255,255,.7),0 18px 44px rgba(20,50,20,.35)} }
+#game{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* ---------- HUD ---------- */
+#hud{position:absolute;z-index:4;top:max(10px,env(safe-area-inset-top,0px));left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));
+  display:grid;grid-template-columns:auto 1fr auto;align-items:start;gap:10px;pointer-events:none}
+#hud > *{pointer-events:auto}
+.chip{background:rgba(255,253,247,.94);border-radius:18px;box-shadow:0 1px 0 rgba(46,33,22,.06),0 6px 18px rgba(30,50,40,.16)}
+.hud-btn{width:50px;height:50px;display:grid;place-items:center}
+.hud-btn .ico{width:24px;height:24px}
+.hud-time{justify-self:center;width:min(100%,290px);padding:8px 14px 10px;display:grid;grid-template-columns:1fr auto;align-items:center;row-gap:7px}
+.hud-time .goal{font-size:14px;color:var(--muted);white-space:nowrap;text-align:left}
+.hud-time .goal b{color:#fff;background:var(--leaf);border-radius:999px;padding:0 9px 1px;font-weight:600;margin-left:2px}
+.hud-time .t{display:flex;align-items:center;gap:4px;font-weight:700;font-size:20px;line-height:1;color:#1F5F8F;font-variant-numeric:tabular-nums}
+.hud-time .t .ico{width:20px;height:20px}
+.hud-time .bar{grid-column:1/-1;height:6px;border-radius:99px;background:#E4ECEF;overflow:hidden}
+.hud-time .bar i{display:block;height:100%;width:100%;background:var(--sky);border-radius:99px;transition:width .25s linear,background .3s}
+.hud-time.warn .t{color:var(--bad)} .hud-time.warn .bar i{background:var(--bad)}
+.hud-time.warn{animation:beat .5s ease-in-out infinite alternate}
+@keyframes beat{to{transform:scale(1.04)}}
+.hud-score{padding:6px 14px 8px;text-align:right;min-width:96px}
+.hud-score .sc{display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:26px;font-weight:700;line-height:1.15;color:var(--clay);font-variant-numeric:tabular-nums}
+.hud-score .sc .ico{width:22px;height:22px}
+.hud-score.bump .sc{animation:bump .35s ease}
+@keyframes bump{40%{transform:scale(1.18)}}
+.tally{display:flex;gap:9px;justify-content:flex-end;font-size:13px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tally span{display:inline-flex;align-items:center;gap:3px}
+.tally .ico{width:14px;height:14px}
+.tally b{font-weight:700;color:var(--ink)}
+
+/* ---------- Toast ---------- */
+#toast{position:absolute;left:50%;top:calc(var(--hudb,80px) + 10px);transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:8px;
+  padding:7px 18px 8px 10px;border-radius:999px;font-weight:700;font-size:17px;color:#fff;white-space:nowrap;opacity:0;pointer-events:none;
+  box-shadow:0 6px 16px rgba(0,0,0,.18)}
+#toast .ico{width:24px;height:24px}
+#toast.good{background:var(--good)} #toast.bad{background:var(--bad)} #toast.info{background:#7B57C0}
+#toast.show{animation:toast 1.1s cubic-bezier(.2,1.2,.4,1) forwards}
+@keyframes toast{0%{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.8)}14%{opacity:1;transform:translateX(-50%) scale(1.04)}
+  24%{transform:translateX(-50%) scale(1)}78%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-8px)}}
+
+/* ---------- Overlays ---------- */
+.overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:20;
+  padding:max(14px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) max(14px,env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));
+  background:rgba(24,48,32,.42);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.overlay.show{display:flex;animation:fade .2s ease}
+@keyframes fade{from{opacity:0}}
+.panel{background:var(--paper);border-radius:28px;width:100%;max-width:440px;max-height:100%;overflow:auto;padding:22px 20px 20px;text-align:center;
+  box-shadow:0 24px 60px rgba(15,35,20,.38);animation:pop .3s cubic-bezier(.2,1.3,.5,1);scrollbar-width:thin}
+@keyframes pop{from{transform:scale(.92) translateY(8px)}}
+h2{font-size:26px;font-weight:700;color:var(--leaf-d);line-height:1.2;text-wrap:balance}
+.sub-text{color:var(--muted);font-size:15px;margin:6px 0 16px;line-height:1.5}
+
+.title{font-size:clamp(34px,10vw,50px);font-weight:700;line-height:1.25;color:var(--leaf-d);text-wrap:balance}
+.title span{color:var(--clay)}
+.subtitle{margin-top:8px;font-size:16px;color:var(--muted)}
+.subtitle b{color:#fff;background:var(--leaf);border-radius:999px;padding:1px 10px 2px;font-weight:600;margin-left:4px}
+#preview{display:block;width:100%;height:170px;margin:16px 0 12px;border-radius:20px}
+.rule{font-size:15px;line-height:1.6}
+.plus{color:var(--good)} .minus{color:var(--bad)}
+.seg-label{font-size:13px;color:var(--muted);margin:16px 0 6px;letter-spacing:.3px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--sand);padding:4px;border-radius:16px;margin-bottom:14px}
+.seg button{padding:7px 4px 6px;border-radius:12px;font-weight:600;font-size:15px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:1px;transition:background .15s}
+.seg button .ico{width:28px;height:28px}
+.seg button small{font-size:11.5px;font-weight:500}
+.seg button[aria-checked="true"]{background:#fff;color:var(--ink);box-shadow:0 2px 8px rgba(46,33,22,.12)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:18px;padding:11px 18px;border-radius:18px;min-height:52px;transition:transform .08s}
+.btn:active{transform:translateY(2px)}
+.btn .ico{width:1.05em;height:1.05em}
+.btn.primary{background:var(--leaf);color:#fff;box-shadow:0 4px 0 var(--leaf-d)}
+.btn.primary:active{box-shadow:0 2px 0 var(--leaf-d)}
+.btn.big{width:100%;font-size:23px;min-height:60px}
+.btn.ghost{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:12px}
+.row .btn{flex:1 1 140px;white-space:nowrap}
+.links{display:flex;justify-content:center;align-items:center;gap:4px 18px;flex-wrap:wrap;margin-top:14px;font-size:15px;color:var(--muted)}
+.link{display:inline-flex;align-items:center;gap:6px;padding:6px 4px;font-weight:600;color:var(--muted);border-radius:10px}
+.link .ico{width:20px;height:20px}
+.best{display:inline-flex;align-items:center;gap:6px}
+.best .ico{width:20px;height:20px}
+.best b{color:#B87400}
+
+/* how-to */
+.steps{text-align:left;margin:16px 0 6px;display:grid;gap:10px;font-size:15px;line-height:1.55}
+.steps li{display:flex;gap:10px;list-style:none}
+.steps .n{flex:0 0 26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;color:#fff;background:var(--clay);margin-top:1px}
+.label{font-weight:600;font-size:15px;text-align:left;margin:14px 0 7px;display:flex;align-items:center;gap:6px}
+.label .ico{width:20px;height:20px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip-w{padding:2px 13px 4px;border-radius:12px;font-family:var(--word);font-weight:800;font-size:21px}
+.chip-w.g{background:#E5F6EB;color:#14653A}
+.chip-w.r{background:#FDEBEB;color:#A8262B}
+.tip{background:#FFF6DC;border-radius:16px;padding:10px 14px;font-size:14.5px;text-align:left;margin-top:16px;line-height:1.6}
+.tip .ico{width:19px;height:19px;margin-right:2px}
+
+/* pause */
+.pause-art{line-height:0;margin:0 0 6px;animation:sway 2.4s ease-in-out infinite}
+.pause-art .ico{width:92px;height:92px}
+@keyframes sway{50%{transform:rotate(-5deg) translateY(-3px)}}
+
+/* result */
+.stars{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin:12px 0 4px}
+.stars span{line-height:0;filter:grayscale(1) opacity(.25)}
+.stars .ico{width:44px;height:44px}
+.stars span:nth-child(2) .ico{width:58px;height:58px}
+.stars span.on{filter:none;animation:starpop .5s cubic-bezier(.2,1.6,.4,1) both;animation-delay:var(--d)}
+@keyframes starpop{from{transform:scale(0) rotate(-30deg)}}
+.final{font-size:60px;font-weight:700;line-height:1.05;color:var(--clay);font-variant-numeric:tabular-nums}
+.final-l{font-size:14px;color:var(--muted)}
+.final-l .ico{width:18px;height:18px;margin:0 2px 0 4px}
+.final-l b{color:var(--ink);font-weight:600}
+.newbest{display:inline-flex;align-items:center;gap:5px;margin-top:8px;background:#FFF1C9;color:#9A5B00;border-radius:999px;padding:3px 14px;font-weight:700;font-size:15px}
+.newbest .ico{width:18px;height:18px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 8px}
+.stat{background:var(--sand);border-radius:16px;padding:9px 4px 8px;line-height:1.2}
+.stat b{display:block;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat small{font-size:12.5px;color:var(--muted)}
+.sub-stats{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 14px;font-size:13.5px;color:var(--muted)}
+.sub-stats b{color:var(--ink);font-weight:700}
+.msg{font-size:16px;font-weight:600;color:var(--leaf-d);margin:14px 4px 2px;line-height:1.5}
+.msg .ico{width:20px;height:20px}
+.tabs{display:flex;gap:4px;margin:20px 0 8px;background:var(--sand);padding:4px;border-radius:14px}
+.tab{flex:1;padding:7px 4px;border-radius:11px;font-weight:600;font-size:14px;color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.tab .ico{width:16px;height:16px}
+.tab.on{background:#fff;color:var(--ink);box-shadow:0 2px 6px rgba(46,33,22,.1)}
+.tab .c{min-width:20px;padding:0 6px;border-radius:99px;font-size:12px;color:#fff;background:#BBAA92}
+.tab.on.t-wrong .c{background:var(--bad)} .tab.on.t-right .c{background:var(--good)} .tab.on.t-miss .c{background:#D98A1A}
+.pane{display:none;text-align:left} .pane.on{display:block}
+.rv{display:flex;gap:12px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid var(--line);font-size:14px;line-height:1.5}
+.rv:last-child{border-bottom:0}
+.rv .w{flex:0 0 auto;min-width:70px;text-align:center;font-family:var(--word);font-size:25px;font-weight:800;padding:1px 8px 3px;border-radius:12px;background:var(--sand);color:#3A220C}
+.rv .info{flex:1;min-width:0;color:var(--muted)}
+.rv .info .ico{width:16px;height:16px}
+.tag{display:inline-block;border-radius:999px;padding:0 9px;font-size:12.5px;font-weight:600;margin:0 4px 3px 0}
+.tag.g{background:#E5F6EB;color:#14653A} .tag.r{background:#FDEBEB;color:#A8262B} .tag.o{background:#FFF0D6;color:#8F5100}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:16px 8px}
+.foot{font-size:13px;color:var(--muted);margin-top:10px;text-align:center}
+@media (max-height:620px){ #preview{height:130px;margin:10px 0 8px} .title{font-size:32px} }
+@media (max-height:540px){ .hud-btn{width:44px;height:44px} .hud-time{padding:6px 12px 8px;row-gap:5px} .hud-score .sc{font-size:22px} }
+@media (prefers-reduced-motion:reduce){ *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important} }
+</style>
+</head>
+<body>
+<!-- ===== ชุดไอคอน SVG ของเกม (ใช้แทนอีโมจิ) ===== -->
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true">
+<defs>
+<symbol id="i-lion" viewBox="0 0 48 48">
+  <g stroke="#7A3D12" stroke-width="2" stroke-linejoin="round">
+    <g fill="#E8762C"><circle cx="24" cy="8.5" r="6"/><circle cx="35" cy="12.5" r="6"/><circle cx="39.5" cy="24" r="6"/><circle cx="35" cy="35.5" r="6"/><circle cx="24" cy="39.5" r="6"/><circle cx="13" cy="35.5" r="6"/><circle cx="8.5" cy="24" r="6"/><circle cx="13" cy="12.5" r="6"/></g>
+    <circle cx="24" cy="24" r="15.5" fill="#E8762C" stroke="none"/>
+    <circle cx="15.5" cy="14.5" r="3.6" fill="#FFC94A"/><circle cx="32.5" cy="14.5" r="3.6" fill="#FFC94A"/>
+    <circle cx="24" cy="25" r="11.5" fill="#FFC94A"/>
+    <ellipse cx="24" cy="30" rx="6" ry="4.2" fill="#FFF1C8"/>
+  </g>
+  <circle cx="19.5" cy="22.5" r="1.9" fill="#2A180A"/><circle cx="28.5" cy="22.5" r="1.9" fill="#2A180A"/>
+  <circle cx="20.1" cy="21.8" r=".6" fill="#fff"/><circle cx="29.1" cy="21.8" r=".6" fill="#fff"/>
+  <path d="M21.6 27.2h4.8L24 29.6z" fill="#7A3D12" stroke="#7A3D12" stroke-width="1.2" stroke-linejoin="round"/>
+  <circle cx="16.5" cy="27.5" r="1.8" fill="#FF8A8A" opacity=".6"/><circle cx="31.5" cy="27.5" r="1.8" fill="#FF8A8A" opacity=".6"/>
+</symbol>
+<symbol id="i-pause" viewBox="0 0 48 48">
+  <g fill="#FF8A4C" stroke="#C0531F" stroke-width="2.4"><rect x="12" y="10" width="9" height="28" rx="3.5"/><rect x="27" y="10" width="9" height="28" rx="3.5"/></g>
+  <g fill="#fff" opacity=".5"><rect x="14.6" y="13" width="2.6" height="10" rx="1.3"/><rect x="29.6" y="13" width="2.6" height="10" rx="1.3"/></g>
+</symbol>
+<symbol id="i-play" viewBox="0 0 48 48">
+  <path d="M15 12.5c0-2.2 2.4-3.5 4.3-2.4l18.6 11.6c1.8 1.1 1.8 3.7 0 4.8L19.3 38.1c-1.9 1.1-4.3-.2-4.3-2.4z" fill="#3DBB6A" stroke="#1E7A43" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M19 15.5v7" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".5"/>
+</symbol>
+<symbol id="i-play-w" viewBox="0 0 48 48">
+  <path d="M15 12.5c0-2.2 2.4-3.5 4.3-2.4l18.6 11.6c1.8 1.1 1.8 3.7 0 4.8L19.3 38.1c-1.9 1.1-4.3-.2-4.3-2.4z" fill="currentColor"/>
+</symbol>
+<symbol id="i-restart" viewBox="0 0 48 48">
+  <g fill="none" stroke="#2F8DD6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M37 24a13 13 0 1 1-4.3-9.7"/><path d="M32.3 6.8l.4 7.5-7.2.6"/></g>
+</symbol>
+<symbol id="i-restart-w" viewBox="0 0 48 48">
+  <g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M37 24a13 13 0 1 1-4.3-9.7"/><path d="M32.3 6.8l.4 7.5-7.2.6"/></g>
+</symbol>
+<symbol id="i-sound" viewBox="0 0 48 48">
+  <path d="M7 19.5C7 18.1 8.1 17 9.5 17H15l9.2-7.4c1.6-1.3 4-.1 4 1.9v24.9c0 2-2.4 3.2-4 1.9L15 31H9.5C8.1 31 7 29.9 7 28.5z" fill="#8E6BE0" stroke="#5D3FB0" stroke-width="2.2" stroke-linejoin="round"/>
+  <g fill="none" stroke="#5D3FB0" stroke-width="3.2" stroke-linecap="round"><path d="M33.5 18.5a8 8 0 0 1 0 11"/><path d="M38.5 13.5a15 15 0 0 1 0 21"/></g>
+</symbol>
+<symbol id="i-mute" viewBox="0 0 48 48">
+  <path d="M7 19.5C7 18.1 8.1 17 9.5 17H15l9.2-7.4c1.6-1.3 4-.1 4 1.9v24.9c0 2-2.4 3.2-4 1.9L15 31H9.5C8.1 31 7 29.9 7 28.5z" fill="#B9AFCF" stroke="#7A7090" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M33.5 18.5l9 11M42.5 18.5l-9 11" stroke="#E04A4F" stroke-width="3.8" stroke-linecap="round"/>
+</symbol>
+<symbol id="i-home" viewBox="0 0 48 48">
+  <path d="M11 21v16a3 3 0 0 0 3 3h20a3 3 0 0 0 3-3V21" fill="#FFE7BF" stroke="#8A5A2B" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M20 40v-9a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v9" fill="#C98B4F" stroke="#8A5A2B" stroke-width="2.2"/>
+  <path d="M6 23.5L24 8l18 15.5" fill="none" stroke="#E8553A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol>
+<symbol id="i-star" viewBox="0 0 48 48">
+  <path d="M24 5l5.7 11.6 12.8 1.9-9.3 9 2.2 12.7L24 34.2l-11.4 6 2.2-12.7-9.3-9 12.8-1.9z" fill="#FFC93C" stroke="#D98A00" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M16 20.5l4.5-.7" stroke="#FFF3B8" stroke-width="2.6" stroke-linecap="round"/>
+</symbol>
+<symbol id="i-trophy" viewBox="0 0 48 48">
+  <g stroke="#B36A00" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M14 11H8.5v3.5A7.5 7.5 0 0 0 16 22M34 11h5.5v3.5A7.5 7.5 0 0 1 32 22" fill="none"/>
+    <path d="M14 7h20v10a10 10 0 0 1-20 0z" fill="#FFC93C"/>
+    <path d="M21 26.5h6v6h-6z" fill="#F2A900"/>
+    <rect x="14" y="32.5" width="20" height="8" rx="2.5" fill="#C98B4F" stroke="#7A4A1E"/>
+  </g>
+  <path d="M18.5 10.5v6" stroke="#FFF3B8" stroke-width="2.6" stroke-linecap="round"/>
+</symbol>
+<symbol id="i-clock" viewBox="0 0 48 48">
+  <rect x="20" y="3.5" width="8" height="5" rx="2" fill="#2F8DD6"/>
+  <path d="M38.5 11.5l3 3" stroke="#2F8DD6" stroke-width="3.6" stroke-linecap="round"/>
+  <circle cx="24" cy="26" r="16" fill="#fff" stroke="#2F8DD6" stroke-width="4"/>
+  <path d="M24 17v9l6 4" fill="none" stroke="#1F4E7A" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol>
+<symbol id="i-paw" viewBox="0 0 48 48">
+  <g fill="#C98B4F" stroke="#7A4A1E" stroke-width="2">
+    <path d="M24 23c6.5 0 12 6 12 11 0 4-3.4 5.5-6.5 5.5-2.4 0-3.6-1.5-5.5-1.5s-3.1 1.5-5.5 1.5C15.4 39.5 12 38 12 34c0-5 5.5-11 12-11z"/>
+    <ellipse cx="12.5" cy="20" rx="4.2" ry="5.2" transform="rotate(-20 12.5 20)"/><ellipse cx="19.5" cy="12" rx="4.2" ry="5.5" transform="rotate(-8 19.5 12)"/>
+    <ellipse cx="28.5" cy="12" rx="4.2" ry="5.5" transform="rotate(8 28.5 12)"/><ellipse cx="35.5" cy="20" rx="4.2" ry="5.2" transform="rotate(20 35.5 20)"/>
+  </g>
+</symbol>
+<symbol id="i-tap" viewBox="0 0 48 48">
+  <g fill="none" stroke="#FF8A4C" stroke-width="3" stroke-linecap="round"><path d="M12 16a13 13 0 0 1 24 0"/><path d="M17 18.5a7.5 7.5 0 0 1 14 0"/></g>
+  <path d="M21 21.5a3 3 0 0 1 6 0V30l6.4 1.3c2.2.5 3.6 2.6 3.2 4.8L35.4 43H20.6l-5.7-7.4a2.7 2.7 0 0 1 3.9-3.7L21 34z" fill="#FFD9B5" stroke="#8A5A2B" stroke-width="2.2" stroke-linejoin="round"/>
+</symbol>
+<symbol id="i-book" viewBox="0 0 48 48">
+  <path d="M5 13v26c7-1 13 0 19 3 6-3 12-4 19-3V13" fill="#5DB8F2" stroke="#2F6FB2" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M24 13c-4-3-10-4-16-3v26c6-1 12 0 16 3 4-3 10-4 16-3V10c-6-1-12 0-16 3z" fill="#fff" stroke="#2F6FB2" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M24 13v26" stroke="#2F6FB2" stroke-width="2.4"/>
+  <g stroke="#A9C9E8" stroke-width="2" stroke-linecap="round"><path d="M12 17h8M12 22h8M12 27h6M28 17h8M28 22h8M28 27h6"/></g>
+</symbol>
+<symbol id="i-gauge1" viewBox="0 0 48 48">
+  <path d="M3 35a21 21 0 0 1 42 0z" fill="#fff" stroke="#8A5A2B" stroke-width="2.4" stroke-linejoin="round"/>
+  <g fill="none" stroke-width="6"><path d="M8 33A16 16 0 0 1 16 19.1" stroke="#3DBB6A"/><path d="M16 19.1A16 16 0 0 1 32 19.1" stroke="#FFC93C" opacity=".35"/><path d="M32 19.1A16 16 0 0 1 40 33" stroke="#E04A4F" opacity=".35"/></g>
+  <path d="M24 33L13.1 27.9" stroke="#3A2614" stroke-width="3.2" stroke-linecap="round"/><circle cx="24" cy="33" r="3.4" fill="#3A2614"/>
+</symbol>
+<symbol id="i-gauge2" viewBox="0 0 48 48">
+  <path d="M3 35a21 21 0 0 1 42 0z" fill="#fff" stroke="#8A5A2B" stroke-width="2.4" stroke-linejoin="round"/>
+  <g fill="none" stroke-width="6"><path d="M8 33A16 16 0 0 1 16 19.1" stroke="#3DBB6A"/><path d="M16 19.1A16 16 0 0 1 32 19.1" stroke="#FFC93C"/><path d="M32 19.1A16 16 0 0 1 40 33" stroke="#E04A4F" opacity=".35"/></g>
+  <path d="M24 33V21" stroke="#3A2614" stroke-width="3.2" stroke-linecap="round"/><circle cx="24" cy="33" r="3.4" fill="#3A2614"/>
+</symbol>
+<symbol id="i-gauge3" viewBox="0 0 48 48">
+  <path d="M3 35a21 21 0 0 1 42 0z" fill="#fff" stroke="#8A5A2B" stroke-width="2.4" stroke-linejoin="round"/>
+  <g fill="none" stroke-width="6"><path d="M8 33A16 16 0 0 1 16 19.1" stroke="#3DBB6A"/><path d="M16 19.1A16 16 0 0 1 32 19.1" stroke="#FFC93C"/><path d="M32 19.1A16 16 0 0 1 40 33" stroke="#E04A4F"/></g>
+  <path d="M24 33l10.9-5.1" stroke="#3A2614" stroke-width="3.2" stroke-linecap="round"/><circle cx="24" cy="33" r="3.4" fill="#3A2614"/>
+</symbol>
+<symbol id="i-check" viewBox="0 0 48 48">
+  <circle cx="24" cy="24" r="18" fill="#3DBB6A" stroke="#1E7A43" stroke-width="2.4"/>
+  <path d="M15.5 24.5l6 6 11-12" fill="none" stroke="#fff" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol>
+<symbol id="i-cross" viewBox="0 0 48 48">
+  <circle cx="24" cy="24" r="18" fill="#E04A4F" stroke="#A82A2F" stroke-width="2.4"/>
+  <path d="M17.5 17.5l13 13M30.5 17.5l-13 13" stroke="#fff" stroke-width="4.6" stroke-linecap="round"/>
+</symbol>
+<symbol id="i-target" viewBox="0 0 48 48">
+  <circle cx="22" cy="26" r="17" fill="#fff" stroke="#C8343A" stroke-width="2.4"/><circle cx="22" cy="26" r="11.5" fill="#E04A4F"/>
+  <circle cx="22" cy="26" r="6.5" fill="#fff"/><circle cx="22" cy="26" r="2.8" fill="#E04A4F"/>
+  <path d="M22 26L40 8" stroke="#8A5A2B" stroke-width="3" stroke-linecap="round"/><path d="M36 6.5l5.5-1.5-1.5 5.5" fill="#5DB8F2" stroke="#2F6FB2" stroke-width="2" stroke-linejoin="round"/>
+</symbol>
+<symbol id="i-hourglass" viewBox="0 0 48 48">
+  <path d="M16 9c0 8 8 10 8 15s-8 7-8 15h16c0-8-8-10-8-15s8-7 8-15z" fill="#EAF6FF" stroke="#2F6FB2" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M19.5 37c1-4 4.5-5 4.5-8 0 3 3.5 4 4.5 8z" fill="#FFC93C"/><path d="M19.5 13h9c-1 3-4.5 4.5-4.5 6.5 0-2-3.5-3.5-4.5-6.5z" fill="#FFC93C"/>
+  <path d="M13 7.5h22M13 40.5h22" stroke="#8A5A2B" stroke-width="4.2" stroke-linecap="round"/>
+</symbol>
+<symbol id="i-bulb" viewBox="0 0 48 48">
+  <path d="M24 5a12 12 0 0 0-7 21.7c1.3 1 2 2.3 2 3.8V32h10v-1.5c0-1.5.7-2.8 2-3.8A12 12 0 0 0 24 5z" fill="#FFD54F" stroke="#C98A00" stroke-width="2.4" stroke-linejoin="round"/>
+  <rect x="18.5" y="33" width="11" height="4.2" rx="1.6" fill="#B9C2CC" stroke="#7D8894" stroke-width="1.8"/><rect x="20" y="37.8" width="8" height="4.2" rx="1.6" fill="#B9C2CC" stroke="#7D8894" stroke-width="1.8"/>
+  <path d="M18.5 14a6.5 6.5 0 0 1 4.5-3.5" stroke="#FFF6C8" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+</symbol>
+<symbol id="i-warn" viewBox="0 0 48 48">
+  <path d="M21.4 8.5a3 3 0 0 1 5.2 0l15 26a3 3 0 0 1-2.6 4.5H9a3 3 0 0 1-2.6-4.5z" fill="#FFB53C" stroke="#C47400" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M24 18v9" stroke="#5A3300" stroke-width="4" stroke-linecap="round"/><circle cx="24" cy="32.5" r="2.4" fill="#5A3300"/>
+</symbol>
+<symbol id="i-sliders" viewBox="0 0 48 48">
+  <g stroke="#fff" stroke-width="3.4" stroke-linecap="round" opacity=".9"><path d="M8 14h32M8 24h32M8 34h32"/></g>
+  <g stroke="#fff" stroke-width="2.4"><circle cx="17" cy="14" r="4.8" fill="#FFC93C"/><circle cx="31" cy="24" r="4.8" fill="#5DB8F2"/><circle cx="21" cy="34" r="4.8" fill="#3DBB6A"/></g>
+</symbol>
+<symbol id="i-panda" viewBox="0 0 48 48">
+  <g stroke="#2A2A2A" stroke-width="1.8"><circle cx="11.5" cy="12.5" r="6" fill="#2E2E2E"/><circle cx="36.5" cy="12.5" r="6" fill="#2E2E2E"/><ellipse cx="24" cy="26.5" rx="18" ry="16.5" fill="#fff"/></g>
+  <ellipse cx="16.5" cy="24.5" rx="4.8" ry="6.2" transform="rotate(30 16.5 24.5)" fill="#2E2E2E"/><ellipse cx="31.5" cy="24.5" rx="4.8" ry="6.2" transform="rotate(-30 31.5 24.5)" fill="#2E2E2E"/>
+  <path d="M14.8 24.5q2.2 2 4.4 0M28.8 24.5q2.2 2 4.4 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  <ellipse cx="24" cy="31.5" rx="3.2" ry="2.3" fill="#2E2E2E"/><path d="M21 35q3 2.2 6 0" stroke="#2E2E2E" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <ellipse cx="11.5" cy="32" rx="3" ry="1.8" fill="#FF9AA8" opacity=".75"/><ellipse cx="36.5" cy="32" rx="3" ry="1.8" fill="#FF9AA8" opacity=".75"/>
+  <text x="38" y="9" font-family="Mali,sans-serif" font-weight="700" font-size="9" fill="#7E5BD6">z</text><text x="43" y="4.5" font-family="Mali,sans-serif" font-weight="700" font-size="6" fill="#7E5BD6">z</text>
+</symbol>
+<symbol id="i-party" viewBox="0 0 48 48">
+  <path d="M7 42l7.5-22 13.5 13.5z" fill="#FFC93C" stroke="#C47400" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M11.5 30l6.5 6.5M9.8 35.5l3 3" stroke="#FF7A59" stroke-width="2.4" stroke-linecap="round"/>
+  <g stroke-width="3" stroke-linecap="round" fill="none"><path d="M23 15c1-4 5-5 4-9" stroke="#8E6BE0"/><path d="M31 22c3-2 6 0 9-2" stroke="#3DBB6A"/></g>
+  <circle cx="35" cy="10" r="2.8" fill="#FF6B8B"/><circle cx="41" cy="28" r="2.3" fill="#5DB8F2"/><circle cx="18" cy="8" r="2.1" fill="#FFC93C"/><circle cx="42" cy="15" r="1.8" fill="#FFC93C"/>
+</symbol>
+<symbol id="i-fire" viewBox="0 0 48 48">
+  <path d="M24 4.5c2 7 12 11 12 22.5a12 12 0 0 1-24 0c0-6 3-9 5-11 0 4 2 6 4 6-1-7 1-12 3-17.5z" fill="#FF7A3C" stroke="#C0451A" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M24 24.5c1 4 6 6 6 11a6 6 0 0 1-12 0c0-4 3-6 6-11z" fill="#FFD54F"/>
+</symbol>
+<symbol id="i-thumb" viewBox="0 0 48 48">
+  <path d="M15 21l7-13c3-1 5 1 4.5 4L25 19h11c2.5 0 4.2 2.4 3.5 4.8l-3.6 12.4A4 4 0 0 1 32 39H15z" fill="#FFD9B5" stroke="#8A5A2B" stroke-width="2.2" stroke-linejoin="round"/>
+  <rect x="7" y="20" width="8" height="20" rx="2" fill="#5DB8F2" stroke="#2F6FB2" stroke-width="2.2"/>
+</symbol>
+</defs>
+</svg>
+<div id="app">
+  <main id="stage">
+    <canvas id="game"></canvas>
+    <header id="hud">
+      <button id="btnPause" class="chip hud-btn" title="หยุดชั่วคราว" aria-label="หยุดชั่วคราว" disabled><svg class="ico" aria-hidden="true"><use href="#i-pause"/></svg></button>
+      <div class="chip hud-time" id="timeBox">
+        <span class="goal">จิ้มคำ<b>แม่เกย</b></span>
+        <span class="t"><svg class="ico" aria-hidden="true"><use href="#i-clock"/></svg><b id="sTime">60</b></span>
+        <span class="bar" aria-hidden="true"><i id="progBar"></i></span>
+      </div>
+      <div class="chip hud-score" id="scoreBox">
+        <div class="sc"><svg class="ico" aria-hidden="true"><use href="#i-star"/></svg><b id="sScore">0</b></div>
+        <div class="tally">
+          <span title="ตอบถูก"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg><b id="sGood">0</b></span>
+          <span title="ตอบผิด"><svg class="ico" aria-hidden="true"><use href="#i-cross"/></svg><b id="sBad">0</b></span>
+          <span title="คะแนนสูงสุด"><svg class="ico" aria-hidden="true"><use href="#i-trophy"/></svg><b id="sBest">0</b></span>
+        </div>
+      </div>
+    </header>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </main>
+</div>
+
+<!-- ===== หน้าเริ่มเกม ===== -->
+<div class="overlay show" id="ovStart">
+  <div class="panel">
+    <h1 class="title">สวนสัตว์<span>แม่เกย</span></h1>
+    <p class="subtitle">เกมฝึกอ่านคำในมาตราตัวสะกด แม่เกย</p>
+    <canvas id="preview" aria-label="ตัวอย่าง: ม้าลายมีคำว่า สวย ให้จิ้ม แพนด้ามีคำว่า นก ให้ปล่อยผ่าน"></canvas>
+    <p class="rule">จิ้มสัตว์ที่มีคำแม่เกย <b class="plus">+10</b> · จิ้มผิด <b class="minus">−10</b><br>คำอื่นปล่อยผ่านได้ · เวลา 60 วินาที</p>
+    <div class="seg-label">โหมดการเล่น</div>
+    <div class="seg" role="radiogroup" aria-label="โหมดการเล่น">
+      <button role="radio" data-diff="normal" aria-checked="true"><svg class="ico" aria-hidden="true"><use href="#i-gauge1"/></svg>ธรรมดา<small>แนะนำ</small></button>
+      <button role="radio" data-diff="fast" aria-checked="false"><svg class="ico" aria-hidden="true"><use href="#i-gauge2"/></svg>เร็ว<small>×1.35</small></button>
+      <button role="radio" data-diff="veryfast" aria-checked="false"><svg class="ico" aria-hidden="true"><use href="#i-gauge3"/></svg>เร็วมาก<small>×1.75</small></button>
+    </div>
+    <button class="btn primary big" id="btnStart"><svg class="ico" aria-hidden="true"><use href="#i-play-w"/></svg>เริ่มเกม</button>
+    <div class="links">
+      <button class="link" id="btnHow"><svg class="ico" aria-hidden="true"><use href="#i-book"/></svg>วิธีเล่น</button>
+      <button class="link" id="btnSound2" data-sound></button>
+      <span class="best"><svg class="ico" aria-hidden="true"><use href="#i-trophy"/></svg>สูงสุด <b id="bestStart">0</b></span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== วิธีเล่น ===== -->
+<div class="overlay" id="ovHow">
+  <div class="panel">
+    <h2>วิธีเล่น</h2>
+    <ol class="steps">
+      <li><span class="n">1</span><span>สัตว์จะเดินหรือวิ่งเข้ามาจากขอบ<b>ซ้ายและขวา</b> บนหลังมีผ้าคลุมเขียนคำศัพท์</span></li>
+      <li><span class="n">2</span><span>ถ้าเป็นคำใน<b>มาตราแม่เกย</b> ให้จิ้มที่ตัวสัตว์หรือผ้าคลุม ได้ <b class="plus">+10</b></span></li>
+      <li><span class="n">3</span><span>จิ้มผิดเสีย <b class="minus">−10</b> (คะแนนไม่ต่ำกว่า 0) คำอื่นปล่อยผ่านได้ ไม่เสียคะแนน</span></li>
+      <li><span class="n">4</span><span>ชนิดและสีของสัตว์ไม่ได้บอกคำตอบ ต้อง<b>อ่านคำ</b>เท่านั้น</span></li>
+    </ol>
+    <div class="label"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>คำแม่เกย จิ้มเลย</div>
+    <div class="chips"><span class="chip-w g">เลย</span><span class="chip-w g">คอย</span><span class="chip-w g">สวย</span><span class="chip-w g">กล้วย</span><span class="chip-w g">อร่อย</span><span class="chip-w g">ควาย</span></div>
+    <div class="label"><svg class="ico" aria-hidden="true"><use href="#i-cross"/></svg>ไม่ใช่แม่เกย ปล่อยผ่าน</div>
+    <div class="chips"><span class="chip-w r">ลม</span><span class="chip-w r">นก</span><span class="chip-w r">ดาว</span><span class="chip-w r">ยาง</span><span class="chip-w r">ปวด</span><span class="chip-w r">ปลา</span></div>
+    <div class="tip"><svg class="ico" aria-hidden="true"><use href="#i-bulb"/></svg><b>เคล็ดลับ</b> ฟังเสียงท้ายคำ ถ้าลงท้ายด้วยเสียง /ย/ คือแม่เกย<br><svg class="ico" aria-hidden="true"><use href="#i-warn"/></svg><b>ย</b> ที่อยู่ต้นคำ เช่น ยาง ยุง ไม่ใช่ตัวสะกด และระวังคำหน้าตาคล้ายกัน เช่น <b>ป่วย</b> (แม่เกย) กับ <b>ปวด</b> (แม่กด)</div>
+    <div class="row"><button class="btn primary" data-close="ovHow">เข้าใจแล้ว</button></div>
+  </div>
+</div>
+
+<!-- ===== พักเกม ===== -->
+<div class="overlay" id="ovPause">
+  <div class="panel" style="max-width:380px">
+    <div class="pause-art"><svg class="ico" aria-hidden="true"><use href="#i-panda"/></svg></div>
+    <h2>พักก่อนนะ</h2>
+    <p class="sub-text" id="pauseInfo">เวลาและสัตว์ทุกตัวหยุดรออยู่</p>
+    <button class="btn primary big" id="btnResume"><svg class="ico" aria-hidden="true"><use href="#i-play-w"/></svg>เล่นต่อ</button>
+    <div class="row">
+      <button class="btn ghost" id="btnPauseRestart"><svg class="ico" aria-hidden="true"><use href="#i-restart"/></svg>เริ่มใหม่</button>
+      <button class="btn ghost" id="btnPauseHome"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg>หน้าหลัก</button>
+    </div>
+    <div class="links"><button class="link" id="btnSound3" data-sound></button></div>
+  </div>
+</div>
+
+<!-- ===== สรุปผล ===== -->
+<div class="overlay" id="ovResult">
+  <div class="panel" id="resultPanel">
+    <h2>หมดเวลา!</h2>
+    <div id="resultBody"></div>
+  </div>
+</div>
+<script>
+(() => {
+'use strict';
+
+/* =====================================================
+   1) คำศัพท์ (ตรวจตามหลักมาตราตัวสะกด)
+   k:1 = แม่เกย (มีเสียงตัวสะกด /ย/)
+   k:0 = ไม่ใช่แม่เกย  m = มาตรา, s = เสียงตัวสะกด, n = หมายเหตุ
+   หลีกเลี่ยงคำที่ใช้สระ ไอ/ใอ เพราะการจัดมาตรายังสอนไม่ตรงกัน
+   ===================================================== */
+const KOEI_WORDS = [
+  ['เลย'],['เคย'],['เนย'],['เขย'],['ลอย'],['คอย'],['ถอย'],['หอย'],['น้อย'],['ร้อย'],['พลอย'],
+  ['อร่อย','พยางค์ "หร่อย" สะกดด้วย ย มีเสียง /ย/'],
+  ['สวย','สระอัว + ตัวสะกด ย มีเสียง /ย/'],['รวย','สระอัว + ตัวสะกด ย มีเสียง /ย/'],
+  ['กล้วย','สระอัว + ตัวสะกด ย มีเสียง /ย/'],['ช่วย','สระอัว + ตัวสะกด ย มีเสียง /ย/'],
+  ['ป่วย','สระอัว + ตัวสะกด ย มีเสียง /ย/'],['ด้วย','สระอัว + ตัวสะกด ย มีเสียง /ย/'],
+  ['มวย','สระอัว + ตัวสะกด ย มีเสียง /ย/'],['ถ้วย','สระอัว + ตัวสะกด ย มีเสียง /ย/'],
+  ['ยาย','ย ตัวแรกเป็นพยัญชนะต้น ย ตัวท้ายเป็นตัวสะกด'],
+  ['ควาย'],['ขาย'],['ซ้าย'],['ปลาย'],['หาย'],['ง่าย'],['สาย'],
+  ['ทราย','ทร ออกเสียง ซ และสะกดด้วย ย'],
+  ['โดย'],['ปุ๋ย'],['คุย'],
+  ['เหนื่อย','สระเอือ + ตัวสะกด ย มีเสียง /ย/'],['เลื่อย','สระเอือ + ตัวสะกด ย มีเสียง /ย/'],
+  // คำที่เพิ่มเข้าคลัง
+  ['ป้าย'],['เอ่ย','สระเออ + ตัวสะกด ย มีเสียง /ย/'],['กล้วยอ้อย','มี 2 พยางค์ กล้วย และ อ้อย สะกดด้วย ย ทั้งคู่'],['บ่ายคล้อย','มี 2 พยางค์ บ่าย และ คล้อย สะกดด้วย ย ทั้งคู่'],['ย่อยสลาย','ย่อย และ สลาย (สะ-หลาย) สะกดด้วย ย ทั้งคู่'],['ห้อยท้าย','มี 2 พยางค์ ห้อย และ ท้าย สะกดด้วย ย ทั้งคู่'],
+  ['หน่อย'],['ต่อย'],['บ่อย'],['ตาย'],['ย้าย','ย ตัวแรกเป็นพยัญชนะต้น ย ตัวท้ายเป็นตัวสะกด'],['สบาย','อ่านว่า สะ-บาย พยางค์ บาย สะกดด้วย ย'],
+  ['เฉลย','อ่านว่า ฉะ-เหลย พยางค์ เหลย สะกดด้วย ย'],['ใบเตย','พยางค์ เตย สะกดด้วย ย มีเสียง /ย/'],['เงย'],['เสย'],['เกย'],['ระเหย','อ่านว่า ระ-เหย พยางค์ เหย สะกดด้วย ย'],
+  ['ลุย'],['ยุ้ย','ย ตัวแรกเป็นพยัญชนะต้น ย ตัวท้ายเป็นตัวสะกด'],['ทาย'],['ขลุ่ย','สระอุ + ตัวสะกด ย มีเสียง /ย/'],['ห้วย','สระอัว + ตัวสะกด ย มีเสียง /ย/']
+];
+const NOT_WORDS = [
+  ['ลม','ม','กม'],['ส้ม','ม','กม'],['ยิ้ม','ม','กม','ย ต้นคำเป็นพยัญชนะต้น ไม่ใช่ตัวสะกด'],
+  ['กบ','บ','กบ'],
+  ['นก','ก','กก'],['ปาก','ก','กก'],['รัก','ก','กก'],['เลข','ก','กก','ข ท้ายคำออกเสียง /ก/'],
+  ['บ้าน','น','กน'],['ดิน','น','กน'],['ฟัน','น','กน'],['จาน','น','กน'],['นอน','น','กน'],['เดิน','น','กน'],
+  ['ดาว','ว','เกอว'],['แมว','ว','เกอว'],['ข้าว','ว','เกอว'],
+  ['รถ','ด','กด','ถ ท้ายคำออกเสียง /ด/'],['มด','ด','กด'],['เป็ด','ด','กด'],
+  ['ยอด','ด','กด','ย ต้นคำเป็นพยัญชนะต้น ไม่ใช่ตัวสะกด'],
+  ['ปวด','ด','กด','หน้าตาคล้าย "ป่วย" แต่สะกดด้วย ด'],['ขวด','ด','กด','หน้าตาคล้าย "สวย" แต่สะกดด้วย ด'],
+  ['ช้าง','ง','กง'],['ยุง','ง','กง','ย ต้นคำเป็นพยัญชนะต้น ไม่ใช่ตัวสะกด'],
+  ['ยาง','ง','กง','ย ต้นคำเป็นพยัญชนะต้น ไม่ใช่ตัวสะกด'],
+  ['มือ','','ก กา'],['ปลา','','ก กา'],['ม้า','','ก กา'],['หมู','','ก กา'],['งู','','ก กา'],
+  ['ปู','','ก กา'],['เสือ','','ก กา'],['ตา','','ก กา'],
+  ['ยา','','ก กา','ย ต้นคำเป็นพยัญชนะต้น ไม่ใช่ตัวสะกด']
+];
+const WORDS = [
+  ...KOEI_WORDS.map(([w,n]) => ({w, k:1, n})),
+  ...NOT_WORDS.map(([w,s,m,n]) => ({w, k:0, s, m, n}))
+];
+function explain(d){
+  if (d.k) return (d.n ? d.n + ' → ' : 'สะกดด้วย ย มีเสียงตัวสะกด /ย/ → ') + 'แม่เกย';
+  const base = d.m === 'ก กา' ? 'ไม่มีตัวสะกด (แม่ ก กา)' : `เสียงตัวสะกด /${d.s}/ → แม่${d.m}`;
+  return (d.n ? d.n + ' · ' : '') + base;
+}
+
+/* =====================================================
+   2) ค่าคงที่ / ตัวช่วย
+   ===================================================== */
+const GAME_TIME = 60, TAU = Math.PI * 2, MAX_PARTICLES = 220;
+const KEY_BEST = 'zooDashMaeKoei_best', KEY_DIFF = 'zooDashMaeKoei_mode', KEY_MUTE = 'zooDashMaeKoei_mute';
+/* โหมดความเร็ว: "ธรรมดา" คือค่าฐาน อีกสองโหมดคูณความเร็วจากฐาน
+   cross = วินาทีที่สัตว์ใช้เดินข้ามจอ (ต้นเกม → ท้ายเกม), interval = ระยะห่างการปล่อยสัตว์, max = จำนวนสัตว์พร้อมกัน */
+const BASE = { cross:[10.5, 8.0], interval:[1.25, 0.9] };
+const mode = (name, icon, speed, spawn, max) => ({ name, icon, speed,
+  cross: BASE.cross.map(v => +(v / speed).toFixed(2)), interval: BASE.interval.map(v => +(v / spawn).toFixed(2)), max });
+const DIFF = {
+  normal:   mode('ธรรมดา', 'gauge1', 1,    1,    [5, 6]),
+  fast:     mode('เร็ว',    'gauge2', 1.35, 1.35, [6, 7]),
+  veryfast: mode('เร็วมาก', 'gauge3', 1.75, 1.75, [7, 8])
+};
+const TRIMS = ['#3E6FB0', '#7B57C0', '#C28E2C', '#8A5A2B'];
+const $ = id => document.getElementById(id);
+const I = (n, c = '') => `<svg class="ico${c ? ' ' + c : ''}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+function store(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
+function load(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* =====================================================
+   3) เสียง (Web Audio API) – สร้างหลังผู้เล่นกดปุ่มเท่านั้น
+   ===================================================== */
+let actx = null, master = null, noiseBuf = null;
+let muted = load(KEY_MUTE) === '1';
+function initAudio(){
+  if (actx){ if (actx.state === 'suspended') actx.resume(); return; }
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    master = actx.createGain(); master.gain.value = muted ? 0 : 0.6; master.connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.3, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  } catch(e){ actx = null; }
+}
+function tone(freq, dur, type = 'sine', vol = 0.2, when = 0, slide = null){
+  if (!actx || muted) return;
+  const t = actx.currentTime + when, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.03);
+}
+function noise(dur, vol, freq){
+  if (!actx || muted || !noiseBuf) return;
+  const t = actx.currentTime, s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + dur + 0.02);
+}
+const sfx = {
+  good(){ tone(660,.12,'triangle',.22); tone(880,.12,'triangle',.22,.07); tone(1320,.22,'triangle',.18,.14);
+          tone(2100,.12,'sine',.06,.2); tone(2600,.12,'sine',.05,.26); },
+  bad(){ tone(330,.28,'sine',.2,0,170); tone(250,.2,'triangle',.08,.06,140); noise(.18,.08,900); },
+  step(){ noise(.06, .03, 380 + Math.random()*180); },
+  warn(){ tone(880,.09,'square',.05); },
+  start(){ [523,659,784,1046].forEach((f,i)=>tone(f,.14,'triangle',.18,i*.08)); },
+  end(){ [784,659,784,1046,1318].forEach((f,i)=>tone(f,.2,'triangle',.18,i*.12)); tone(2093,.4,'sine',.06,.6); },
+  combo(){ [1046,1318,1568,2093].forEach((f,i)=>tone(f,.12,'sine',.1,i*.06)); },
+  star(i){ tone(1046 + i * 260, .18, 'triangle', .14); tone(2093 + i * 300, .12, 'sine', .05, .05); },
+  click(){ tone(700,.06,'triangle',.08); }
+};
+function setMuted(m){
+  muted = m; store(KEY_MUTE, m ? '1' : '0');
+  if (master) master.gain.value = m ? 0 : 0.6;
+  document.querySelectorAll('[data-sound]').forEach(b => {
+    b.innerHTML = I(m ? 'mute' : 'sound') + (m ? 'เสียงปิด' : 'เสียงเปิด');
+    b.setAttribute('aria-pressed', String(!m));
+  });
+}
+
+/* =====================================================
+   4) Canvas / Layout
+   ===================================================== */
+const stage = $('stage'), canvas = $('game'), ctx = canvas.getContext('2d');
+const bg = document.createElement('canvas'), bctx = bg.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const L = { baseS: 100, k: 80, fontBase: 40, signH: 74, lanes: [], laneK: [], horizon: 0, pathTop: 0, hudB: 70 };
+
+function measureHud(){
+  const s = stage.getBoundingClientRect(), h = $('hud').getBoundingClientRect();
+  return Math.max(0, h.bottom - s.top);
+}
+function computeLayout(){
+  L.hudB = measureHud();
+  stage.style.setProperty('--hudb', L.hudB + 'px');
+  L.fontBase = clamp(Math.min(W * 0.13, H * 0.09), 36, 72);
+  L.signH = L.fontBase * 1.35 + 10;
+  // k = พิกเซลต่อ (เมตร^0.7): ยีราฟสูงไม่เกิน 62% ของพื้นที่เล่น ช้างยาวไม่เกิน 90% ของความกว้าง
+  L.k = clamp(Math.min(0.62 * (H - L.hudB) / 3.09, 0.9 * W / 3.6), 40, 140);
+  L.baseS = L.k * 1.3;
+  L.horizon = clamp(L.hudB + H * 0.13, H * 0.26, H * 0.4);
+  const yBot = H - 10, zebraH = L.k * 1.51, minGap = L.signH + 18;
+  let yTop = Math.max(H * 0.45, L.hudB + 10 + L.signH + zebraH * 0.95);
+  yTop = Math.min(yTop, yBot - minGap);
+  const n = clamp(Math.floor((yBot - yTop) / minGap) + 1, 2, 3);
+  L.lanes = []; L.laneK = [];
+  for (let i = 0; i < n; i++){
+    L.lanes.push(yTop + (yBot - yTop) * i / (n - 1));
+    L.laneK.push(0.9 + 0.14 * i / (n - 1));
+  }
+  L.pathTop = Math.max(L.horizon + 26, yTop - zebraH * 0.55);
+}
+
+function resize(){
+  const r = stage.getBoundingClientRect();
+  const nW = Math.max(260, Math.floor(r.width)), nH = Math.max(240, Math.floor(r.height));
+  const ratio = W ? nW / W : 1;
+  W = nW; H = nH; DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  computeLayout();
+  for (const a of animals){
+    a.lane = Math.min(a.lane, L.lanes.length - 1);
+    a.x *= ratio; a.speed *= ratio; a.baseSpeed *= ratio;
+    derive(a);
+  }
+  particles.length = 0;
+  initClouds();
+  renderBg();
+  sizePreview();
+}
+
+/* =====================================================
+   5) ฉากสวนสัตว์ (วาดครั้งเดียวลง offscreen canvas)
+   ===================================================== */
+function ridge(c, base, fn, fill){
+  c.beginPath(); c.moveTo(0, base + 4);
+  for (let x = 0; x <= W + 12; x += 12) c.lineTo(x, fn(x));
+  c.lineTo(W, base + 4); c.closePath(); c.fillStyle = fill; c.fill();
+}
+function ell(c, x, y, rx, ry, col, rot = 0){ c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, TAU); c.fillStyle = col; c.fill(); }
+function acacia(c, x, y, s, rng){
+  c.strokeStyle = '#6B5137'; c.lineCap = 'round';
+  c.lineWidth = s * 0.06; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x - s * 0.04, y - s * 0.45, x - s * 0.24, y - s * 0.74); c.stroke();
+  c.lineWidth = s * 0.045; c.beginPath(); c.moveTo(x - s * 0.02, y - s * 0.36); c.quadraticCurveTo(x + s * 0.14, y - s * 0.55, x + s * 0.3, y - s * 0.72); c.stroke();
+  const blobs = [[-0.3, -0.8, 0.4, 0.09], [0.04, -0.85, 0.5, 0.11], [0.36, -0.79, 0.34, 0.08], [-0.05, -0.92, 0.28, 0.07]];
+  blobs.forEach(b => ell(c, x + b[0] * s, y + b[1] * s, b[2] * s, b[3] * s, '#3E9A3E'));
+  blobs.forEach(b => ell(c, x + b[0] * s, y + (b[1] - b[3] * 0.35) * s, b[2] * s * 0.82, b[3] * s * 0.55, '#62BE4F'));
+}
+function roundTree(c, x, y, s){
+  c.fillStyle = '#6B5137'; c.fillRect(x - s * 0.04, y - s * 0.5, s * 0.08, s * 0.5);
+  [[0, -0.72, 0.36, 0.3], [-0.24, -0.58, 0.26, 0.22], [0.25, -0.6, 0.26, 0.22]].forEach(b => ell(c, x + b[0] * s, y + b[1] * s, b[2] * s, b[3] * s, '#3E9E43'));
+  [[-0.06, -0.8, 0.24, 0.17], [-0.28, -0.64, 0.14, 0.1]].forEach(b => ell(c, x + b[0] * s, y + b[1] * s, b[2] * s, b[3] * s, '#6CCB55'));
+}
+function renderBg(){
+  bg.width = canvas.width; bg.height = canvas.height;
+  const c = bctx; c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const hz = L.horizon, rng = mulberry32(11);
+  // ท้องฟ้า
+  let g = c.createLinearGradient(0, 0, 0, hz);
+  g.addColorStop(0, '#3DA9F0'); g.addColorStop(0.65, '#8DD3FA'); g.addColorStop(1, '#D9F4FF');
+  c.fillStyle = g; c.fillRect(0, 0, W, hz + 30);
+  // แสงแดด
+  const sr = clamp(Math.min(W, H) * 0.045, 16, 34), sx = W * 0.84, sy = clamp(L.hudB + sr * 1.8, sr * 2, hz - sr * 1.6);
+  g = c.createRadialGradient(sx, sy, 0, sx, sy, sr * 5);
+  g.addColorStop(0, 'rgba(255,246,190,1)'); g.addColorStop(0.22, 'rgba(255,232,130,.65)'); g.addColorStop(1, 'rgba(255,232,130,0)');
+  c.fillStyle = g; c.fillRect(sx - sr * 5, sy - sr * 5, sr * 10, sr * 10);
+  ell(c, sx, sy, sr, sr, '#FFE36B'); ell(c, sx - sr * 0.2, sy - sr * 0.2, sr * 0.65, sr * 0.65, '#FFF3B0');
+  // เนินเขาไกล
+  ridge(c, hz, x => hz - H * (0.05 + 0.022 * Math.sin(x * 0.004 + 1) + 0.01 * Math.sin(x * 0.013)), '#9FD9C2');
+  ridge(c, hz, x => hz - H * (0.022 + 0.012 * Math.sin(x * 0.007 + 3)), '#7FCC6E');
+  // ต้นไม้
+  const n = Math.max(3, Math.round(W / 240));
+  for (let i = 0; i < n; i++){
+    const x = (i + 0.2 + rng() * 0.6) * W / n, s = clamp(H * 0.13, 40, 110) * (0.7 + rng() * 0.45);
+    if (rng() < 0.65) acacia(c, x, hz + 3, s, rng); else roundTree(c, x, hz + 3, s * 0.8);
+  }
+  // ทุ่งหญ้า
+  g = c.createLinearGradient(0, hz, 0, H);
+  g.addColorStop(0, '#9EE06A'); g.addColorStop(1, '#6CC64A');
+  c.fillStyle = g; c.fillRect(0, hz, W, H - hz);
+  // รั้วไม้เตี้ย
+  const fh = clamp(H * 0.045, 12, 26), fy = hz + fh * 0.9;
+  c.fillStyle = '#C0874E';
+  c.fillRect(0, fy - fh * 0.8, W, Math.max(3, fh * 0.13)); c.fillRect(0, fy - fh * 0.38, W, Math.max(3, fh * 0.13));
+  for (let x = 20; x < W; x += Math.max(70, W / 12)){ c.fillStyle = '#A8703C'; c.fillRect(x - 3, fy - fh, 6, fh + 2); c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(x - 2, fy - fh, 1.5, fh); }
+  // ป้ายเล็กของสวนสัตว์
+  const bw = clamp(W * 0.2, 96, 150), bh = clamp(fh * 1.25, 22, 32), bx = W * 0.05, by = fy - fh - bh * 0.9;
+  c.fillStyle = '#7A5232'; c.fillRect(bx + bw * 0.2, by + bh * 0.5, 5, fh + bh * 0.5); c.fillRect(bx + bw * 0.78, by + bh * 0.5, 5, fh + bh * 0.5);
+  c.beginPath(); c.roundRect ? c.roundRect(bx, by, bw, bh, 7) : c.rect(bx, by, bw, bh);
+  c.fillStyle = '#FFD27A'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#8A5426'; c.stroke();
+  c.fillStyle = '#5A3518'; c.font = `700 ${bh * 0.56}px Mali, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('สวนสัตว์', bx + bw / 2, by + bh * 0.52, bw - 10);
+  // ทางเดินดินทราย
+  const pt = L.pathTop, wav = x => pt + Math.sin(x * 0.012) * 4 + Math.sin(x * 0.041) * 1.5;
+  g = c.createLinearGradient(0, pt, 0, H);
+  g.addColorStop(0, '#FBE7B8'); g.addColorStop(1, '#F2CF8E');
+  c.fillStyle = g; c.beginPath(); c.moveTo(0, wav(0));
+  for (let x = 0; x <= W + 10; x += 10) c.lineTo(x, wav(x));
+  c.lineTo(W, H); c.lineTo(0, H); c.closePath(); c.fill();
+  g = c.createLinearGradient(0, pt - 4, 0, pt + 14);
+  g.addColorStop(0, 'rgba(120,90,40,.16)'); g.addColorStop(1, 'rgba(120,90,40,0)');
+  c.fillStyle = g; c.fillRect(0, pt - 4, W, 18);
+  // พุ่มหญ้าริมทาง
+  c.strokeStyle = '#5DBB45'; c.lineCap = 'round'; c.lineWidth = 1.8;
+  for (let x = rng() * 30; x < W; x += 34 + rng() * 40){
+    const y = wav(x) + 2, h = 6 + rng() * 6;
+    for (let k = -2; k <= 2; k++){ c.beginPath(); c.moveTo(x + k * 2, y); c.quadraticCurveTo(x + k * 3, y - h * 0.6, x + k * 4.2, y - h + Math.abs(k)); c.stroke(); }
+  }
+  // ลายเม็ดทราย
+  for (let i = 0; i < Math.round(W * (H - pt) / 2400); i++){
+    c.fillStyle = rng() < 0.6 ? 'rgba(200,140,70,.16)' : 'rgba(255,255,255,.5)';
+    ell(c, rng() * W, pt + 14 + rng() * (H - pt - 14), 1.5 + rng() * 2.5, 1 + rng() * 1.2, c.fillStyle);
+  }
+}
+
+let clouds = [];
+function initClouds(){
+  clouds = [];
+  const top = Math.max(L.hudB + 8, H * 0.04), bottom = Math.max(top + 20, L.horizon - H * 0.1);
+  for (let i = 0; i < 3; i++) clouds.push({ x: (i + Math.random() * 0.6) * W / 3, y: lerp(top, bottom, Math.random()), s: clamp(H * 0.035, 12, 26) * (0.8 + Math.random() * 0.5), v: 4 + Math.random() * 6 });
+}
+const PUFFS = [[0, 0, 1.7, 0.7], [-1.1, 0.15, 1, 0.55], [1.2, 0.15, 1.05, 0.55], [0.15, -0.45, 1, 0.7]];
+function drawClouds(c){
+  for (const k of clouds){
+    c.fillStyle = 'rgba(200,232,255,.95)';
+    PUFFS.forEach(e => { c.beginPath(); c.ellipse(k.x + e[0] * k.s, k.y + e[1] * k.s + k.s * 0.15, e[2] * k.s, e[3] * k.s, 0, 0, TAU); c.fill(); });
+    c.fillStyle = 'rgba(255,255,255,.95)';
+    PUFFS.forEach(e => { c.beginPath(); c.ellipse(k.x + e[0] * k.s, k.y + e[1] * k.s, e[2] * k.s, e[3] * k.s, 0, 0, TAU); c.fill(); });
+  }
+}
+function drawMark(c, x, y, r, ok){
+  c.save(); c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = '#fff'; c.lineWidth = r * 0.32; c.beginPath();
+  if (ok){ c.moveTo(x - r * 0.45, y + r * 0.02); c.lineTo(x - r * 0.12, y + r * 0.35); c.lineTo(x + r * 0.48, y - r * 0.3); }
+  else { c.moveTo(x - r * 0.36, y - r * 0.36); c.lineTo(x + r * 0.36, y + r * 0.36); c.moveTo(x + r * 0.36, y - r * 0.36); c.lineTo(x - r * 0.36, y + r * 0.36); }
+  c.stroke(); c.restore();
+}
+
+/* =====================================================
+   6) สัตว์ — วาดด้วยเส้นโค้งตามสรีระจริง (Catmull-Rom spline)
+   หน่วยภายใน: เท้าอยู่ที่ y=0 หันไปทางขวา
+   วาด 2 รอบ: รอบแรกวาดเส้นขอบรอบตัวทั้งตัว รอบสองลงสีและรายละเอียด
+   จึงได้เงาตัวต่อเนื่องเป็นชิ้นเดียว ไม่เห็นรอยต่อระหว่างชิ้นส่วน
+   ขาใช้ inverse kinematics: เท้าแตะพื้นตอนรับน้ำหนัก ยกขึ้นตอนก้าว ไม่ไถลบนพื้น
+   ===================================================== */
+let PASS = 'fill', OUTC = '#2e2116', OW = 1.6, PX = 1, BLINK = false;
+const _rgb = {};
+function rgb(hex){
+  if (_rgb[hex]) return _rgb[hex];
+  if (hex[0] !== '#') return (_rgb[hex] = hex.match(/[\d.]+/g).slice(0, 3).map(Number));
+  const n = parseInt(hex.slice(1), 16);
+  return (_rgb[hex] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]);
+}
+const mix = (hex, t, to) => `rgb(${rgb(hex).map(v => Math.round(v + (to - v) * t)).join(',')})`;
+const lt = (hex, t) => mix(hex, t, 255), dk = (hex, t) => mix(hex, t, 0);
+
+function sm(c, p, closed = true){
+  const n = p.length >> 1;
+  const id = i => closed ? ((i % n) + n) % n : clamp(i, 0, n - 1);
+  const X = i => p[2 * id(i)], Y = i => p[2 * id(i) + 1];
+  c.beginPath(); c.moveTo(p[0], p[1]);
+  const m = closed ? n : n - 1;
+  for (let i = 0; i < m; i++){
+    c.bezierCurveTo(X(i) + (X(i + 1) - X(i - 1)) / 6, Y(i) + (Y(i + 1) - Y(i - 1)) / 6,
+                    X(i + 1) - (X(i + 2) - X(i)) / 6, Y(i + 1) - (Y(i + 2) - Y(i)) / 6, X(i + 1), Y(i + 1));
+  }
+  if (closed) c.closePath();
+}
+function pl(c, p){ c.beginPath(); c.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) c.lineTo(p[i], p[i + 1]); c.closePath(); }
+function yr(p){ let a = 1e9, b = -1e9; for (let i = 1; i < p.length; i += 2){ if (p[i] < a) a = p[i]; if (p[i] > b) b = p[i]; } return [a, b]; }
+const isFill = () => PASS === 'fill';
+function shape(c, p, col, o = {}){
+  const build = o.poly ? pl : sm;
+  if (PASS === 'out'){ if (o.noOut) return; build(c, p); c.lineWidth = OW * 2; c.strokeStyle = OUTC; c.stroke(); return; }
+  build(c, p);
+  if (o.flat) c.fillStyle = col;
+  else {
+    const [a, b] = yr(p), g = c.createLinearGradient(0, a, 0, b);
+    g.addColorStop(0, lt(col, o.hi ?? 0.14)); g.addColorStop(0.5, col); g.addColorStop(1, dk(col, o.lo ?? 0.18));
+    c.fillStyle = g;
+  }
+  c.fill();
+  if (o.pat){ c.save(); build(c, p); c.clip(); o.pat(c); c.restore(); }
+  if (o.edge){ c.save(); build(c, p); c.lineWidth = 1.3 * PX; c.strokeStyle = dk(col, 0.55); c.globalAlpha *= 0.4; c.stroke(); c.restore(); }
+}
+function tubePts(pts, ws){
+  const n = pts.length >> 1, A = [], B = [];
+  for (let i = 0; i < n; i++){
+    const a = Math.max(0, i - 1), b = Math.min(n - 1, i + 1);
+    let dx = pts[2 * b] - pts[2 * a], dy = pts[2 * b + 1] - pts[2 * a + 1];
+    const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const w = (Array.isArray(ws) ? ws[i] : ws) / 2;
+    A.push(pts[2 * i] - dy * w, pts[2 * i + 1] + dx * w);
+    B.unshift(pts[2 * i] + dy * w, pts[2 * i + 1] - dx * w);
+  }
+  return A.concat(B);
+}
+const tube = (c, pts, ws, col, o) => shape(c, tubePts(pts, ws), col, o);
+function dot(c, x, y, rx, ry, col, rot = 0){ if (!isFill()) return; c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, TAU); c.fillStyle = col; c.fill(); }
+function ln(c, pts, col, w, alpha = 1){
+  if (!isFill()) return;
+  c.save(); c.globalAlpha *= alpha; sm(c, pts, false); c.lineWidth = w; c.strokeStyle = col; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke(); c.restore();
+}
+function eye(c, x, y, r){
+  if (!isFill()) return;
+  if (BLINK){ ln(c, [x - r, y, x, y + r * 0.45, x + r, y], '#1b120b', r * 0.55); return; }
+  dot(c, x, y, r * 1.12, r, '#1b120b');
+  dot(c, x + r * 0.35, y - r * 0.35, r * 0.36, r * 0.36, 'rgba(255,255,255,.9)');
+}
+function ik(hx, hy, fx, fy, l1, l2, bend){
+  let dx = fx - hx, dy = fy - hy, d = Math.hypot(dx, dy);
+  const mx = l1 + l2 - 0.01;
+  if (d > mx){ fx = hx + dx / d * mx; fy = hy + dy / d * mx; dx = fx - hx; dy = fy - hy; d = mx; }
+  const A = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1));
+  const an = Math.atan2(dy, dx) - bend * A;
+  return [hx, hy, hx + Math.cos(an) * l1, hy + Math.sin(an) * l1, fx, fy];
+}
+// เท้า: วาดในกรอบของข้อเท้า (จุดเริ่ม = ข้อเท้า, พื้นอยู่ที่ y = h) — ขาจบที่ข้อเท้า เท้าต่อจากตรงนั้น
+// ตอนรับน้ำหนักเท้าวางราบกับพื้น ตอนยกขาเท้าเอียงตามหน้าแข้ง
+const FOOT_H = { hoof: 1.75, paw: 0.72, pad: 0.42, hand: 0.85 };
+function foot(c, kind, w, hoofCol, legCol, S){
+  const h = FOOT_H[kind] * w;
+  if (kind === 'hoof'){
+    shape(c, [-w * 0.5, -w * 0.5, w * 0.5, -w * 0.5, w * 0.58, h * 0.48, -w * 0.5, h * 0.5], S.pastern || legCol, { hi: 0.05, lo: 0.12 });
+    shape(c, [-w * 0.58, h * 0.4, w * 0.52, h * 0.34, w * 1.02, h, -w * 0.64, h], hoofCol, { poly: true, hi: 0.22, lo: 0.08 });
+    ln(c, [-w * 0.46, h * 0.46, w * 0.5, h * 0.4], lt(hoofCol, 0.45), Math.max(0.6, w * 0.12), 0.7);
+    if (S.cloven) ln(c, [w * 0.66, h * 0.52, w * 0.78, h], dk(hoofCol, 0.5), Math.max(0.5, w * 0.1), 0.9);
+  } else if (kind === 'paw'){
+    shape(c, [-w * 0.5, -w * 0.4, w * 0.5, -w * 0.4, w * 0.62, h * 0.18, w * 1.12, h * 0.42, w * 1.3, h * 0.8, w * 1.08, h, -w * 0.44, h, -w * 0.6, h * 0.55], legCol, { hi: 0.06, lo: 0.2 });
+    const tl = dk(legCol, 0.45);
+    ln(c, [w * 0.62, h * 0.5, w * 0.7, h * 0.97], tl, Math.max(0.6, w * 0.07), 0.55);
+    ln(c, [w * 0.9, h * 0.46, w * 0.98, h * 0.97], tl, Math.max(0.6, w * 0.07), 0.55);
+    if (S.claws) [0.76, 1.02, 1.24].forEach((k, i) => ln(c, [w * k, h * (0.86 - i * 0.04), w * (k + 0.16), h * 0.98, w * (k + 0.24), h], S.claws, Math.max(0.6, w * 0.07), 0.95));
+  } else if (kind === 'pad'){
+    shape(c, [-w * 0.5, -w * 0.3, w * 0.5, -w * 0.3, w * 0.56, h * 0.45, w * 0.64, h, -w * 0.62, h, -w * 0.55, h * 0.45], legCol, { hi: 0.04, lo: 0.16 });
+    if (isFill()) [-0.4, -0.05, 0.3].forEach(k => {
+      c.beginPath(); c.ellipse(w * (k + 0.1), h * 0.98, w * 0.12, h * 0.42, 0, Math.PI, TAU); c.fillStyle = '#ECE5D2'; c.fill();
+      c.lineWidth = 0.6; c.strokeStyle = 'rgba(80,80,70,.35)'; c.stroke();
+    });
+  } else if (kind === 'hand'){
+    shape(c, [-w * 0.45, -w * 0.3, w * 0.45, -w * 0.3, w * 0.6, h * 0.45, w * 1.45, h * 0.66, w * 1.68, h * 0.95, w * 1.4, h, -w * 0.5, h], hoofCol, { hi: 0.08, lo: 0.16 });
+    ln(c, [w * 0.9, h * 0.72, w * 1.55, h * 0.9], dk(hoofCol, 0.35), Math.max(0.5, w * 0.08), 0.5);
+  }
+}
+function leg(c, ph, off, hx, hy, Lg, S, col, near){
+  const a = ph + off, s = Math.sin(a), co = Math.cos(a);
+  const fx = hx + Lg.fo + S.stride * s, fy = co > 0 ? -S.lift * co : 0;
+  const kind = S.foot, w2 = Lg.w[2], fh = kind ? FOOT_H[kind] * w2 : 0;
+  const j = ik(hx, hy, fx, fy - fh, Lg.l1, Lg.l2 - fh, Lg.bend);
+  tube(c, j, Lg.w, col, { edge: near, pat: S.legPat, hi: 0.08, lo: 0.1 });
+  if (!kind) return;
+  const lift = clamp(-fy / S.lift, 0, 1), tilt = Math.atan2(j[5] - j[3], j[4] - j[2]) - Math.PI / 2;
+  const hoofCol = near ? (S.footCol || dk(col, 0.1)) : dk(S.footCol || col, 0.1);
+  c.save(); c.translate(j[4], j[5]); c.rotate(tilt * 0.85 * lift);
+  foot(c, kind, w2, hoofCol, col, S);
+  c.restore();
+}
+// สัตว์สี่ขา: ลำตัวยืดได้ (ext) เพื่อรับผ้าคลุมที่เขียนคำยาว — ส่วนหน้าเลื่อนไปหน้า ส่วนหลังเลื่อนไปหลัง
+function quad(c, ph, ext, S){
+  const torso = S.torso.map((v, i) => i % 2 ? v : v > 0 ? v + ext : v - ext);
+  const legCol = S.leg || S.col, far = dk(legCol, 0.13), H = S.hl, Fr = S.fl, fd = S.farDx || 3;
+  leg(c, ph, Math.PI, H.x - ext + fd, H.y - 1, H, S, far, false);
+  leg(c, ph, Math.PI * 1.5, Fr.x + ext + fd, Fr.y - 1, Fr, S, far, false);
+  if (S.tail){ c.save(); c.translate(-ext, 0); S.tail(c, ph); c.restore(); }
+  shape(c, torso, S.col, { pat: S.pat ? cc => S.pat(cc, ext) : null, hi: 0.1, lo: 0.24 });
+  leg(c, ph, 0, H.x - ext, H.y, H, S, legCol, true);
+  leg(c, ph, Math.PI * 0.5, Fr.x + ext, Fr.y, Fr, S, legCol, true);
+  c.save(); c.translate(ext, 0);
+  if (S.nod){ c.translate(S.nod[0], S.nod[1]); c.rotate(Math.sin(ph * 2) * 0.016); c.translate(-S.nod[0], -S.nod[1]); }
+  S.front(c, ph);
+  c.restore();
+}
+
+/* ---------- ลวดลายประจำตัว ---------- */
+const INK = '#2B2623';
+function zebraStripes(c, ext){
+  c.strokeStyle = INK; c.lineCap = 'round'; c.lineWidth = 3.2;
+  for (let x = -54 - ext; x <= 40 + ext; x += 6.6){
+    const sk = x < -27 - ext ? -9 : x > 16 + ext ? 3 : 0;
+    c.beginPath(); c.moveTo(x - sk / 2, -66); c.bezierCurveTo(x + 4, -56, x - 3, -44, x + sk / 2 + 1, -30); c.stroke();
+  }
+}
+function zebraLegs(c){
+  c.strokeStyle = INK; c.lineWidth = 2.3;
+  for (let y = -48; y < -4; y += 4.4){ c.beginPath(); c.moveTo(-160, y); c.lineTo(160, y + 1.2); c.stroke(); }
+}
+function acrossStripes(c, ax, ay, bx, by, n, half, w){
+  const dx = bx - ax, dy = by - ay, l = Math.hypot(dx, dy), nx = -dy / l, ny = dx / l;
+  c.strokeStyle = INK; c.lineWidth = w; c.lineCap = 'round';
+  for (let i = 0; i < n; i++){
+    const t = (i + 0.5) / n, px = ax + dx * t, py = ay + dy * t;
+    c.beginPath(); c.moveTo(px - nx * half, py - ny * half); c.quadraticCurveTo(px + dx / l * 2, py + dy / l * 2, px + nx * half, py + ny * half); c.stroke();
+  }
+}
+function makePatches(seed, x0, x1, y0, y1, cell){
+  const r = mulberry32(seed), out = [];
+  for (let y = y0, row = 0; y < y1; y += cell * 0.86, row++){
+    for (let x = x0 + (row % 2) * cell / 2; x < x1; x += cell){
+      const cx = x + (r() - 0.5) * cell * 0.3, cy = y + (r() - 0.5) * cell * 0.3, rad = cell * (0.38 + r() * 0.07), p = [];
+      for (let k = 0; k < 6; k++){ const an = k / 6 * TAU + r() * 0.5; const rr = rad * (0.85 + r() * 0.25); p.push(cx + Math.cos(an) * rr, cy + Math.sin(an) * rr); }
+      out.push(p);
+    }
+  }
+  return out;
+}
+const GIR_BODY = makePatches(7, -110, 110, -102, -56, 10.5);
+const GIR_NECK = makePatches(9, 6, 64, -162, -76, 8.6);
+function patches(c, list, col){ c.fillStyle = col; for (const p of list){ sm(c, p); c.fill(); } }
+const LION_MANE = (() => {
+  const p = [], N = 28;
+  for (let i = 0; i < N; i++){
+    const a = i / N * TAU, r = (i % 2 ? 1 : 1.11) * (1 + 0.035 * Math.sin(i * 1.9));
+    p.push(37 + Math.cos(a) * 18.5 * r, -55 + Math.sin(a) * 24 * r);
+  }
+  return p;
+})();
+
+/* ---------- ข้อมูลรูปร่างของสัตว์แต่ละชนิด ---------- */
+const SPEC = {
+  zebra: {
+    col: '#F6F3EC', out: '#26211e', foot: 'hoof', footCol: '#2a2624', pastern: '#3A3532', stride: 15, lift: 8, nod: [28, -56],
+    torso: [24,-62, 4,-59, -18,-60, -36,-61, -44,-53, -45,-43, -37,-36, -22,-35, -4,-33, 14,-34, 25,-37, 33,-43, 36,-51, 32,-58],
+    hl: { x: -31, y: -41, l1: 23, l2: 21, w: [15, 6.5, 4.6], fo: -2, bend: -1 },
+    fl: { x: 25, y: -40, l1: 21, l2: 21, w: [12, 6.2, 4.6], fo: 2, bend: 1 },
+    pat: zebraStripes, legPat: zebraLegs,
+    tail(c, ph){
+      const sw = Math.sin(ph) * 2;
+      tube(c, [-42,-57, -48,-50, -50 + sw * 0.5,-41, -50 + sw,-33], [3.4, 3, 2.6, 2.2], '#E6E1D7');
+      shape(c, [-53 + sw,-35, -47 + sw,-34, -46 + sw,-25, -50 + sw,-20, -54 + sw,-26], INK);
+    },
+    front(c){
+      shape(c, [20,-60, 28,-72, 38,-83, 46,-88, 52,-84, 48,-72, 41,-60, 36,-48, 28,-46], this.col,
+        { pat: cc => acrossStripes(cc, 26, -52, 48, -86, 6, 16, 3.2) });
+      tube(c, [21,-63, 29,-75, 38,-86, 45,-92], [5, 5.6, 5, 4], INK);
+      shape(c, [47,-90, 47,-101, 50,-99, 51,-90], '#D6D0C5');
+      shape(c, [43,-89, 41,-101, 44,-100, 48,-90], this.col);
+      shape(c, [44,-90, 51,-92, 58,-86, 65,-77, 70,-69, 71,-63, 66,-60, 59,-63, 53,-70, 47,-78], this.col, { pat: cc => {
+        acrossStripes(cc, 47, -86, 64, -70, 4, 9, 2.6);
+        cc.fillStyle = '#3A3330'; cc.beginPath(); cc.ellipse(68, -64, 7.5, 6.5, 0.5, 0, TAU); cc.fill();
+      } });
+      dot(c, 68.5, -65, 1.4, 1.1, '#000');
+      eye(c, 55, -82, 2.1);
+    }
+  },
+  lion: {
+    col: '#EDAE4E', out: '#6a3d10', foot: 'paw', footCol: '#E8A84A', stride: 12, lift: 6, nod: [26, -52],
+    torso: [20,-55, 0,-53, -22,-52, -38,-53, -46,-47, -48,-38, -41,-30, -26,-28, -6,-27, 12,-28, 24,-31, 32,-38, 33,-47, 28,-53],
+    hl: { x: -34, y: -36, l1: 20, l2: 18, w: [18, 9, 8], fo: -1, bend: -1 },
+    fl: { x: 23, y: -36, l1: 19, l2: 18, w: [14, 9, 8], fo: 2, bend: 1 },
+    pat(c, ext){ c.fillStyle = 'rgba(255,238,205,.5)'; c.beginPath(); c.ellipse(-8, -27, 34 + ext, 5.5, 0, 0, TAU); c.fill(); },
+    tail(c, ph){
+      const sw = Math.sin(ph * 0.8) * 3;
+      tube(c, [-46,-48, -56,-43, -61,-32, -60 + sw,-20], [4, 3.4, 3, 2.6], '#E3A145');
+      shape(c, [-63 + sw,-22, -58 + sw,-22, -56 + sw,-15, -60 + sw,-11, -64 + sw,-15], '#6E3F1C');
+    },
+    front(c){
+      shape(c, LION_MANE, '#B5602A', { hi: 0.14, lo: 0.28, pat: cc => {
+        cc.strokeStyle = 'rgba(70,35,10,.35)'; cc.lineWidth = 1.2; cc.lineCap = 'round';
+        for (let i = 0; i < 9; i++){ const a = 1.2 + i * 0.42; cc.beginPath(); cc.moveTo(37 + Math.cos(a) * 9, -55 + Math.sin(a) * 12); cc.lineTo(37 + Math.cos(a) * 19, -55 + Math.sin(a) * 25); cc.stroke(); }
+      } });
+      shape(c, [42,-69, 42,-77, 47,-76, 48,-70], this.col);
+      dot(c, 44.6, -72.6, 1.6, 2, '#6E3F1C');
+      shape(c, [41,-70, 50,-71, 57,-66, 62,-60, 64,-55, 62,-51, 56,-49, 48,-50, 43,-56, 40,-63], this.col);
+      dot(c, 58, -53.5, 6, 3.8, '#F2DDB4');
+      dot(c, 62.6, -57, 2.4, 1.8, '#4A2A1E');
+      ln(c, [62.5,-52, 59.5,-50.6, 56,-51.2], '#5a3714', 1);
+      ln(c, [47,-67.5, 51,-68.5, 54.5,-67], '#7A4A20', 1, 0.6);
+      eye(c, 51, -63.5, 2.1);
+    }
+  },
+  elephant: {
+    col: '#A3AFBD', out: '#46505c', foot: 'pad', footCol: '#94A0AE', stride: 11, lift: 5, nod: [30, -60],
+    torso: [18,-74, -2,-80, -26,-78, -42,-68, -48,-55, -47,-42, -39,-33, -20,-31, 0,-31, 16,-33, 27,-39, 33,-52, 30,-66],
+    hl: { x: -33, y: -37, l1: 19, l2: 20, w: [21, 16, 16], fo: 0, bend: 1 },
+    fl: { x: 20, y: -37, l1: 19, l2: 20, w: [20, 15.5, 16], fo: 1, bend: 1 },
+    pat(c, ext){
+      c.strokeStyle = 'rgba(60,66,74,.25)'; c.lineWidth = 1; c.lineCap = 'round';
+      [[-40 - ext, -48], [-36 - ext, -42], [22 + ext, -46]].forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 6, -0.4, 0.9); c.stroke(); });
+    },
+    tail(c, ph){
+      const sw = Math.sin(ph) * 1.5;
+      tube(c, [-46,-60, -50,-52, -51 + sw,-42], [2.6, 2.2, 1.8], '#8E969E');
+      shape(c, [-53 + sw,-43, -49 + sw,-43, -50 + sw,-37, -52 + sw,-37], '#3D4248');
+    },
+    front(c, ph){
+      const sw = Math.sin(ph) * 2;
+      shape(c, [26,-72, 36,-80, 48,-80, 56,-72, 60,-60, 58,-50, 50,-44, 38,-44, 28,-52], this.col);
+      tube(c, [56,-58, 62,-48, 65,-35, 64 + sw * 0.5,-22, 67 + sw,-13, 71 + sw,-11], [13, 11, 9, 7.5, 6, 5], this.col, { pat: cc => {
+        cc.strokeStyle = 'rgba(60,66,74,.35)'; cc.lineWidth = 0.9;
+        for (let y = -46; y < -14; y += 4){ cc.beginPath(); cc.moveTo(55, y); cc.lineTo(75, y + 1.5); cc.stroke(); }
+      } });
+      shape(c, [55,-49, 60,-45, 66,-40, 65,-38, 58,-42, 53,-46], '#F2ECDD', { hi: 0.05, lo: 0.08 });
+      shape(c, [30,-74, 20,-77, 11,-69, 9,-55, 14,-42, 24,-39, 31,-47, 35,-62], '#AEB9C6', { edge: true, pat: cc => {
+        cc.fillStyle = 'rgba(240,160,180,.45)'; cc.beginPath(); cc.ellipse(20, -58, 7, 12, -0.1, 0, TAU); cc.fill();
+      } });
+      ln(c, [43,-68.5, 47,-69.6, 50,-68.5], '#4b5258', 1, 0.6);
+      eye(c, 47, -65, 1.8);
+    }
+  },
+  giraffe: {
+    col: '#FCE3A8', out: '#6a3e18', foot: 'hoof', footCol: '#4a3020', cloven: true, stride: 23, lift: 11, nod: [24, -90], farDx: 3,
+    torso: [22,-96, 2,-90, -18,-86, -31,-83, -38,-77, -37,-69, -30,-63, -14,-62, 6,-63, 20,-65, 29,-71, 32,-83, 29,-92],
+    hl: { x: -27, y: -69, l1: 37, l2: 36, w: [15, 7.2, 5.4], fo: -1, bend: -1 },
+    fl: { x: 22, y: -70, l1: 38, l2: 36, w: [13.5, 7, 5.4], fo: 2, bend: 1 },
+    pat(c){ patches(c, GIR_BODY, '#D67A2E'); },
+    tail(c, ph){
+      const sw = Math.sin(ph) * 2;
+      tube(c, [-37,-82, -41,-72, -42 + sw * 0.5,-60, -42 + sw,-50], [2.6, 2.2, 2, 1.8], '#E3C995');
+      shape(c, [-44 + sw,-52, -40 + sw,-52, -40 + sw,-43, -42 + sw,-40, -44 + sw,-43], '#3a2414');
+    },
+    front(c){
+      shape(c, [16,-94, 26,-114, 37,-136, 45,-152, 54,-153, 51,-138, 42,-114, 35,-90, 31,-78], this.col,
+        { pat: cc => patches(cc, GIR_NECK, '#D67A2E') });
+      tube(c, [19,-99, 29,-119, 39,-140, 46,-154], [3.4, 3.4, 3, 2.6], '#B8642A');
+      tube(c, [56,-159, 56.5,-169], [3, 2.6], '#C9A46E'); dot(c, 56.5, -170, 2, 1.8, '#3a2414');
+      shape(c, [50,-157, 40,-161, 42,-156, 49,-153], this.col);
+      shape(c, [45,-155, 52,-160, 60,-157, 68,-149, 72,-143, 70,-139, 63,-140, 55,-144, 49,-148], this.col, { pat: cc => {
+        cc.fillStyle = '#C07B40'; [[52,-150, 2.4], [58,-146, 1.8], [49,-155, 1.6]].forEach(([x, y, r]) => { cc.beginPath(); cc.arc(x, y, r, 0, TAU); cc.fill(); });
+      } });
+      tube(c, [51,-159, 49.5,-170], [3.2, 2.8], '#D8B47A'); dot(c, 49.4, -171, 2.2, 2, '#3a2414');
+      dot(c, 69.6, -143.6, 1, 0.8, '#5a3a1e');
+      eye(c, 58, -152, 1.9);
+    }
+  },
+  bear: {
+    col: '#9A6238', out: '#3d230f', foot: 'paw', footCol: '#6B4126', claws: '#E9DEC8', stride: 10, lift: 6, nod: [22, -52],
+    torso: [16,-61, 0,-58, -20,-56, -36,-55, -46,-47, -47,-35, -40,-26, -22,-24, -2,-24, 14,-26, 25,-32, 30,-44, 27,-55],
+    hl: { x: -34, y: -33, l1: 17, l2: 17, w: [21, 12, 11], fo: 0, bend: 1 },
+    fl: { x: 19, y: -33, l1: 17, l2: 17, w: [17, 11.5, 11], fo: 2, bend: 1 },
+    tail(c){ shape(c, [-46,-50, -50,-48, -49,-43, -45,-44], this.col); },
+    front(c){
+      shape(c, [18,-60, 28,-60, 34,-50, 30,-40, 22,-38], this.col);
+      shape(c, [30,-59, 29,-67, 35,-68, 37,-61], this.col);
+      dot(c, 32.6, -63.6, 1.6, 2, '#4a2e1a');
+      shape(c, [24,-56, 32,-62, 41,-61, 47,-56, 53,-51, 58,-48, 58,-44, 53,-41, 44,-40, 34,-42, 26,-47], this.col);
+      dot(c, 52, -45.5, 6.5, 3.8, '#C8956A');
+      dot(c, 57.2, -47, 2.4, 1.9, '#1e130b');
+      ln(c, [56.5,-43, 53.5,-42, 50.5,-42.6], '#2a1a0c', 0.9);
+      eye(c, 43, -53, 1.8);
+    }
+  },
+  panda: {
+    col: '#F3F1EB', leg: '#2A2A2C', out: '#1f1f21', foot: 'paw', footCol: '#1f1f21', claws: '#8A8A88', stride: 10, lift: 6, nod: [22, -52],
+    torso: [16,-61, 0,-59, -20,-57, -36,-56, -46,-48, -47,-35, -40,-26, -22,-24, -2,-24, 14,-26, 25,-32, 30,-44, 27,-55],
+    hl: { x: -34, y: -33, l1: 17, l2: 17, w: [21, 12, 11], fo: 0, bend: 1 },
+    fl: { x: 19, y: -33, l1: 17, l2: 17, w: [17, 11.5, 11], fo: 2, bend: 1 },
+    pat(c, ext){ c.fillStyle = '#2A2A2C'; sm(c, [4 + ext,-72, 22 + ext,-72, 34 + ext,-48, 33 + ext,-18, 8 + ext,-18, 5 + ext,-42]); c.fill(); },
+    tail(c){ shape(c, [-46,-50, -50,-48, -49,-43, -45,-44], this.col); },
+    front(c){
+      shape(c, [18,-60, 28,-60, 34,-50, 30,-40, 22,-38], this.col);
+      shape(c, [29,-60, 27,-68, 34,-70, 37,-62], '#2A2A2C');
+      shape(c, [24,-56, 31,-63, 40,-64, 48,-59, 53,-52, 55,-46, 52,-42, 44,-40, 34,-41, 26,-46], this.col);
+      dot(c, 44, -52.5, 5, 3.4, '#2A2A2C', 0.55);
+      if (isFill()){
+        if (BLINK) ln(c, [42.6,-52.4, 44.2,-51.6, 45.8,-52.4], '#E8E6E0', 0.9);
+        else { dot(c, 44.6, -52.8, 1.5, 1.4, '#0d0d0d'); dot(c, 45, -53.3, 0.5, 0.5, '#fff'); }
+      }
+      dot(c, 54, -47.6, 2.3, 1.8, '#1a1a1a');
+      ln(c, [53.6,-43.6, 51,-42.8, 48.4,-43.4], '#2a2a2a', 0.9);
+    }
+  },
+  monkey: {
+    col: '#A0703F', out: '#3e2814', foot: 'hand', footCol: '#6a4a2e', stride: 9, lift: 6, nod: [14, -44],
+    torso: [12,-45, -4,-44, -18,-46, -28,-41, -30,-32, -23,-27, -8,-28, 6,-29, 15,-33, 17,-41],
+    hl: { x: -21, y: -34, l1: 17, l2: 16, w: [11, 6.5, 5], fo: -2, bend: 1 },
+    fl: { x: 12, y: -34, l1: 18, l2: 16, w: [8.5, 6, 5], fo: 3, bend: -1 },
+    tail(c, ph){
+      const sw = Math.sin(ph * 0.7) * 2;
+      tube(c, [-27,-41, -37,-48, -42,-59, -39 + sw,-69, -32 + sw,-72, -28 + sw,-68], [4, 3.6, 3.2, 2.8, 2.4, 2], this.col);
+    },
+    front(c){
+      shape(c, [13,-48, 16,-57, 24,-62, 32,-60, 36,-53, 35,-46, 29,-42, 21,-42, 15,-44], this.col);
+      shape(c, [25,-57, 31,-58, 36,-54, 38.5,-48, 34,-43.5, 27,-45, 23.5,-51], '#F0B898', { hi: 0.1, lo: 0.12 });
+      dot(c, 19.5, -53, 2.6, 3.2, '#C29274');
+      ln(c, [26.5,-55.6, 30,-56.8, 33.5,-55.4], '#4a3020', 1.1);
+      eye(c, 30.4, -53.2, 1.6);
+      dot(c, 37, -49.3, 0.7, 0.6, '#5a3a24');
+      ln(c, [37.4,-45.8, 34.6,-45, 31.6,-45.8], '#6a4430', 0.9);
+    }
+  },
+  rabbit: {
+    col: '#D2B68E', out: '#4e3a22', stride: 15,
+    draw(c, ph, ext){
+      const air = Math.max(0, Math.sin(ph)), reach = Math.sin(ph) * 3;
+      const X = x => x > 0 ? x + ext : x - ext;
+      const far = dk(this.col, 0.12);
+      // ขาหลัง/หน้าฝั่งไกล
+      shape(c, [X(-22),-3, X(-10),-4, X(-1) - air * 5,-2.5 + air * 2, X(0) - air * 5,0 + air * 2, X(-22),0], far);
+      tube(c, [X(10) + 2,-13, X(11) + 2 + reach * 0.5,-6, X(13) + 2 + reach + air * 3,0], [4.6, 3.4, 3.2], far);
+      // หางปุย
+      shape(c, [X(-27),-26, X(-31),-28, X(-34),-24, X(-32),-19, X(-28),-19], '#F4EFE6', { hi: 0.03, lo: 0.08 });
+      // ลำตัว
+      shape(c, [12,-30, 0,-35, -14,-34, -25,-28, -29,-18, -26,-8, -16,-4, -2,-4, 8,-7, 14,-14, 15,-22].map((v, i) => i % 2 ? v : X(v)), this.col,
+        { hi: 0.12, lo: 0.2, pat: cc => { cc.fillStyle = 'rgba(250,244,232,.6)'; cc.beginPath(); cc.ellipse(0, -5, 18 + ext, 4.5, 0, 0, TAU); cc.fill(); } });
+      // สะโพกและเท้าหลังฝั่งใกล้
+      shape(c, [X(-25),-23, X(-14),-27, X(-6),-19, X(-8),-8, X(-18),-5, X(-27),-11], this.col, { edge: true });
+      shape(c, [X(-25),-3, X(-12),-4.5, X(-2) - air * 5,-3 + air * 2, X(-1) - air * 5,0 + air * 2, X(-25),0], dk(this.col, 0.05), { edge: true });
+      // ขาหน้าฝั่งใกล้
+      tube(c, [X(10),-13, X(11) + reach * 0.5,-6, X(13) + reach + air * 3,0], [5, 3.6, 3.4], this.col, { edge: true });
+      // หัวและหู
+      c.save(); c.translate(ext, 0);
+      tube(c, [20,-39, 20.5,-50, 22.5,-61], [5.5, 6.5, 3.5], dk(this.col, 0.06));
+      shape(c, [10,-31, 14,-39, 22,-41, 29,-37, 33,-31, 32,-26, 26,-23, 18,-23, 12,-26], this.col);
+      tube(c, [16,-39, 13,-50, 11,-61], [6, 7, 3.8], this.col);
+      ln(c, [15.4,-42, 12.8,-50, 11.6,-57], '#E3A9A9', 2.2, 0.8);
+      dot(c, 32.2, -29.6, 1.4, 1.1, '#C77F8A');
+      ln(c, [33,-27.5, 39,-28.5], '#6d5a44', 0.5, 0.6); ln(c, [33,-27, 38.5,-25.5], '#6d5a44', 0.5, 0.6);
+      eye(c, 23.5, -34, 2.3);
+      c.restore();
+    }
+  }
+};
+// ขนาดตามจริง: realH = ความสูงจริงโดยประมาณถึงยอดหัว/หู (เมตร), top = ความสูงในหน่วยภายใน
+// x0/x1 = ขอบหลัง/ขอบหน้าของตัว (หน่วยภายใน) ใช้หาจุดกึ่งกลางสำหรับป้ายและพื้นที่จิ้ม
+const SP = {
+  giraffe:  { realH: 5.0,  top: 172, x0: -44, x1: 73, back: -91, lx: -4,  edge: 28, tilt: 9 },
+  elephant: { realH: 3.3,  top: 82,  x0: -54, x1: 73, back: -79, lx: -8,  edge: 32 },
+  zebra:    { realH: 1.8,  top: 102, x0: -56, x1: 72, back: -62, lx: -5,  edge: 32 },
+  bear:     { realH: 1.3,  top: 68,  x0: -50, x1: 60, back: -59, lx: -10, edge: 30 },
+  lion:     { realH: 1.2,  top: 82,  x0: -64, x1: 65, back: -55, lx: -12, edge: 30 },
+  panda:    { realH: 0.85, top: 70,  x0: -50, x1: 57, small: true },
+  monkey:   { realH: 0.6,  top: 74,  x0: -45, x1: 40, small: true },
+  rabbit:   { realH: 0.35, top: 63,  x0: -35, x1: 40, small: true, hop: true }
+};
+// ย่อช่วงห่างของขนาดด้วยกำลัง 0.7 เพื่อให้กระต่ายยังมองเห็นบนจอมือถือ (ลำดับเล็ก-ใหญ่ยังตรงตามจริง)
+const SIZE_POW = 0.7;
+Object.values(SP).forEach(v => { v.cx = (v.x0 + v.x1) / 2; v.hw = (v.x1 - v.x0) / 2; v.rel = Math.pow(v.realH, SIZE_POW); });
+const SPECIES = Object.keys(SP);
+const RATE = {};
+SPECIES.forEach(k => { RATE[k] = 2 * SPEC[k].stride / Math.PI; });
+const LABEL_FONT = fs => `800 ${fs}px Sarabun, Tahoma, sans-serif`;
+function prepLabel(c, a){
+  c.font = LABEL_FONT(a.fs);
+  const tw = c.measureText(a.d.w).width;
+  a.lw = Math.max(tw + a.fs * 0.9, a.fs * 2.2);
+  a.lh = a.fs * 1.5;
+  a.ext = 0;
+}
+
+/* =====================================================
+   7) สถานะเกม
+   ===================================================== */
+let state = 'menu';  // menu | playing | paused | over
+let diff = DIFF[load(KEY_DIFF)] ? load(KEY_DIFF) : 'normal';
+let best = parseInt(load(KEY_BEST), 10) || 0;
+let animals = [], particles = [], floats = [], banner = null;
+let score = 0, good = 0, bad = 0, passed = 0, combo = 0, timeLeft = GAME_TIME, elapsed = 0;
+let spawnT = 0, stepT = 0, lastWarn = 99, nextId = 1, demoT = 0, globalT = 0;
+let log = { correct: [], wrong: [], missed: [], passedNot: 0 };
+let lastType = null, streak = 0, recent = [], countK = 0, countN = 0, lastSpecies = null;
+
+function diffNow(){
+  const d = DIFF[diff], p = clamp(elapsed / GAME_TIME, 0, 1), e = p * 0.6 + p * p * 0.4;
+  return { cross: lerp(d.cross[0], d.cross[1], e), interval: lerp(d.interval[0], d.interval[1], e), max: Math.round(lerp(d.max[0], d.max[1], e)) };
+}
+function pickWord(){
+  let wantK;
+  if (lastType !== null && streak >= 2) wantK = !lastType;
+  else wantK = Math.random() < clamp(0.5 + (countN - countK) * 0.08, 0.25, 0.75);
+  let pool = WORDS.filter(w => !!w.k === wantK && !recent.includes(w.w));
+  if (!pool.length) pool = WORDS.filter(w => !!w.k === wantK);
+  const d = pick(pool);
+  recent.push(d.w); if (recent.length > 10) recent.shift();
+  if (lastType === wantK) streak++; else { lastType = wantK; streak = 1; }
+  wantK ? countK++ : countN++;
+  return d;
+}
+function sizeAnimal(a, k, fs){
+  const sp = SP[a.sp];
+  a.u = k * sp.rel * a.kk / sp.top;
+  a.fs = fs;
+  ctx.font = LABEL_FONT(100);
+  const em = ctx.measureText(a.d.w).width / 100;
+  a.aw = fs * (em + 0.7);
+  a.onBody = false;
+  if (!sp.small){
+    // วางคำบนตัวได้ถ้าคำไม่ยาวเกินลำตัว (ลดตัวอักษรได้ไม่ต่ำกว่า 80%) ไม่เช่นนั้นลอยเหนือหัว
+    const bfs = Math.min(fs, sp.edge * 2 * 1.5 * a.u / (em + 0.3));
+    if (bfs >= fs * 0.8){ a.onBody = true; a.bfs = bfs; a.bw = bfs * (em + 0.7); }
+  }
+  a.half = Math.max(sp.hw * a.u, (a.onBody ? a.bw : a.aw) / 2) + Math.abs(sp.cx) * a.u + 14;
+}
+function derive(a){
+  a.y = L.lanes[a.lane]; a.kk = L.laneK[a.lane];
+  sizeAnimal(a, L.k, L.fontBase * (0.95 + (a.kk - 0.9) * 0.5));
+}
+function laneFree(i, dir, half){
+  const edge = dir === 1 ? -half : W + half;
+  for (const a of animals){
+    if (a.lane !== i || a.state !== 'walk') continue;
+    if (a.dir !== dir) return false;
+    if (Math.abs(a.x - edge) < a.half + half + L.baseS * 0.3) return false;
+  }
+  return true;
+}
+function spawnAnimal(demo){
+  const cfg = demo ? { cross: 12, max: 4 } : diffNow();
+  if (animals.filter(a => a.state === 'walk').length >= cfg.max) return false;
+  // เลือกชนิดที่ยังไม่อยู่บนจอก่อน เพื่อให้สัตว์หลากหลาย
+  const onScreen = animals.filter(x => x.state === 'walk').map(x => x.sp);
+  let pool = SPECIES.filter(k => !onScreen.includes(k) && k !== lastSpecies);
+  if (!pool.length) pool = SPECIES.filter(k => k !== lastSpecies);
+  const sp = pick(pool);
+  const a = { id: nextId++, d: demo ? pick(WORDS) : null, sp, dir: Math.random() < 0.5 ? 1 : -1, lane: 0,
+    phase: rand(0, TAU), state: 'walk', st: 0, alpha: 1, dustT: 0, demo: !!demo, trim: pick(TRIMS) };
+  a.d = a.d || { w: 'ก', k: 0 };
+  derive(a);
+  let lanes = [];
+  for (let i = 0; i < L.lanes.length; i++) if (laneFree(i, a.dir, a.half)) lanes.push(i);
+  if (!lanes.length){ a.dir = -a.dir; for (let i = 0; i < L.lanes.length; i++) if (laneFree(i, a.dir, a.half)) lanes.push(i); }
+  if (!lanes.length) return false;
+  lastSpecies = sp;
+  if (!demo) a.d = pickWord();
+  a.lane = pick(lanes);
+  derive(a);
+  a.x = a.dir === 1 ? -a.half : W + a.half;
+  a.baseSpeed = a.speed = (W + 2 * a.half) / cfg.cross * rand(0.9, 1.1);
+  animals.push(a);
+  return true;
+}
+
+/* =====================================================
+   8) อนุภาค / ข้อความลอย
+   ===================================================== */
+function addP(p){ if (particles.length < MAX_PARTICLES) particles.push(p); }
+function dust(x, y, n, s){
+  for (let i = 0; i < n; i++) addP({ t: 'dust', x: x + rand(-6, 6), y: y - rand(0, 3), vx: rand(-16, 16), vy: rand(-18, -5), life: 0, max: rand(0.4, 0.7), size: s * rand(0.6, 1.2), col: 'rgba(200,170,120,' });
+}
+function stars(x, y, n, s){
+  const cols = ['#FFD54F', '#FFB300', '#FF8FB1', '#7CD6FF', '#9BE58A'];
+  for (let i = 0; i < n; i++){ const a = rand(0, TAU), v = rand(80, 220);
+    addP({ t: 'star', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, g: 260, life: 0, max: rand(0.6, 1), size: s * rand(0.5, 1), col: pick(cols), rot: rand(0, TAU), vr: rand(-6, 6) }); }
+  addP({ t: 'ring', x, y, vx: 0, vy: 0, life: 0, max: 0.45, size: s * 2.2, col: '#FFD54F' });
+}
+function shards(x, y, n, s){
+  for (let i = 0; i < n; i++){ const a = rand(0, TAU), v = rand(60, 170);
+    addP({ t: 'shard', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, g: 320, life: 0, max: rand(0.5, 0.8), size: s * rand(0.4, 0.9), col: pick(['#9E9E9E', '#B08A64', '#E57373']), rot: rand(0, TAU), vr: rand(-8, 8) }); }
+  addP({ t: 'ring', x, y, vx: 0, vy: 0, life: 0, max: 0.35, size: s * 1.8, col: '#D6454B' });
+  dust(x, y + 10, 8, s * 1.2);
+}
+function confetti(n){
+  const cols = ['#FF6B8B', '#FFD54F', '#4FC3F7', '#81C784', '#B388FF', '#FF9F43'];
+  for (let i = 0; i < n; i++) addP({ t: 'conf', x: rand(0, W), y: rand(-40, -5), vx: rand(-30, 30), vy: rand(60, 160), g: 60, life: 0, max: rand(1.6, 2.6), size: rand(5, 9), col: pick(cols), rot: rand(0, TAU), vr: rand(-6, 6) });
+}
+function floatText(x, y, text, col, size){ floats.push({ x, y, text, col, size, life: 0, max: 1.1 }); }
+function showToast(text, cls, icon){
+  const t = $('toast'); t.className = ''; t.innerHTML = (icon ? I(icon) : '') + '<span></span>'; t.lastChild.textContent = text;
+  void t.offsetWidth; t.className = cls + ' show';
+}
+
+/* =====================================================
+   9) Update
+   ===================================================== */
+function update(dt){
+  globalT += dt;
+  for (const k of clouds){ k.x += k.v * dt; if (k.x - k.s * 3 > W) k.x = -k.s * 3; }
+
+  if (state === 'playing'){
+    elapsed += dt; timeLeft = Math.max(0, GAME_TIME - elapsed);
+    const sec = Math.ceil(timeLeft);
+    if (sec <= 10 && sec < lastWarn && timeLeft > 0){ lastWarn = sec; sfx.warn(); $('timeBox').classList.add('warn'); }
+    spawnT -= dt;
+    if (spawnT <= 0) spawnT = spawnAnimal(false) ? diffNow().interval * rand(0.8, 1.2) : 0.25;
+    stepT -= dt;
+    if (stepT <= 0){ stepT = 0.45; if (animals.some(a => a.state === 'walk')) sfx.step(); }
+    updateHUD();
+    if (timeLeft <= 0) endGame();
+  } else if (state === 'menu'){
+    demoT -= dt; if (demoT <= 0) demoT = spawnAnimal(true) ? 1.8 : 0.4;
+  }
+
+  // รักษาระยะห่างของสัตว์ในเลนเดียวกัน
+  for (const a of animals){
+    if (a.state !== 'walk') continue;
+    let target = a.baseSpeed;
+    for (const b of animals){
+      if (b === a || b.lane !== a.lane || b.dir !== a.dir || b.state !== 'walk') continue;
+      const ahead = (b.x - a.x) * a.dir, gap = a.half + b.half;
+      if (ahead > 0 && ahead < gap) target = Math.min(target, b.speed * (ahead < gap * 0.85 ? 0.9 : 1));
+    }
+    a.speed += (target - a.speed) * Math.min(1, dt * 4);
+  }
+
+  for (let i = animals.length - 1; i >= 0; i--){
+    const a = animals[i], sp = SP[a.sp];
+    if (a.state === 'walk'){
+      a.x += a.dir * a.speed * dt;
+      a.phase += dt * a.speed / (a.u * RATE[a.sp]);
+      a.dustT -= dt;
+      if (a.dustT <= 0){ a.dustT = sp.hop ? 0.32 : 0.24; dust(a.x + a.dir * (sp.cx - sp.hw * 0.5) * a.u, a.y, 1, clamp(a.u * 4, 2.5, 7)); }
+      const out = a.dir === 1 ? a.x > W + a.half : a.x < -a.half;
+      if (out){
+        if (state === 'playing' && !a.demo){
+          passed++;
+          if (a.d.k) log.missed.push(a.d); else log.passedNot++;
+        }
+        animals.splice(i, 1);
+      }
+    } else if (a.state === 'good'){
+      a.st += dt; a.phase += dt * 6;
+      if (a.st > 0.9) animals.splice(i, 1);
+    } else if (a.state === 'bad'){
+      a.st += dt;
+      if (a.st > 0.4){ a.x += a.dir * a.speed * 2.6 * dt; a.phase += dt * a.speed * 2.6 / (a.u * RATE[a.sp]); }
+      a.alpha = a.st > 0.6 ? Math.max(0, 1 - (a.st - 0.6) / 0.5) : 1;
+      if (a.st > 1.1) animals.splice(i, 1);
+    }
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--){
+    const p = particles[i]; p.life += dt;
+    if (p.life >= p.max){ particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.g) p.vy += p.g * dt;
+    if (p.vr) p.rot += p.vr * dt;
+    if (p.t === 'dust'){ p.vx *= 0.94; p.vy *= 0.94; }
+  }
+  for (let i = floats.length - 1; i >= 0; i--){ const f = floats[i]; f.life += dt; f.y -= 50 * dt; if (f.life >= f.max) floats.splice(i, 1); }
+  if (banner){ banner.life += dt; if (banner.life >= banner.max) banner = null; }
+}
+
+/* =====================================================
+   10) Draw
+   ===================================================== */
+function pose(a){
+  const sp = SP[a.sp];
+  let ox = 0, oy = 0, sc = 1, rot = 0, alpha = a.alpha;
+  if (sp.hop) oy -= Math.max(0, Math.sin(a.phase)) * 9 * a.u;
+  else oy -= (1 - Math.cos(a.phase * 2)) * 0.35 * a.u;
+  if (a.state === 'good'){
+    const p = Math.min(a.st / 0.55, 1);
+    oy -= Math.sin(p * Math.PI) * 26 * a.u; sc = 1 + 0.12 * Math.sin(p * Math.PI); rot = Math.sin(p * TAU) * 0.08;
+    if (a.st > 0.55){ const q = (a.st - 0.55) / 0.35; sc = 1 - q * 0.5; alpha = 1 - q; }
+  } else if (a.state === 'bad'){
+    if (a.st < 0.4){ ox = Math.sin(a.st * 70) * 5; oy -= Math.sin(a.st / 0.4 * Math.PI) * 8 * a.u; }
+  }
+  return { ox, oy, sc, rot, alpha };
+}
+function drawAnimal(c, a){
+  const sp = SP[a.sp], S = SPEC[a.sp], ext = a.ext || 0, P = pose(a), al = clamp(P.alpha, 0, 1);
+  // เงาบนพื้น
+  const lift = clamp(-P.oy / (40 * a.u), 0, 0.6);
+  c.save(); c.globalAlpha = al * 0.2 * (1 - lift); c.fillStyle = '#5a4012';
+  c.beginPath(); c.ellipse(a.x + P.ox + a.dir * sp.cx * a.u, a.y + 1, sp.hw * 0.8 * a.u * (1 - lift * 0.3), Math.max(3, sp.hw * 0.09 * a.u), 0, 0, TAU); c.fill();
+  c.restore();
+  c.save(); c.globalAlpha = al;
+  c.translate(a.x + P.ox, a.y + P.oy); c.rotate(P.rot); c.scale(a.dir * a.u * P.sc, a.u * P.sc);
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  PX = 1 / (a.u * P.sc); OW = 1.7 * PX; OUTC = S.out;
+  BLINK = a.state === 'walk' && ((globalT + a.id * 1.37) % 3.6) < 0.13;
+  for (const pass of ['out', 'fill']){
+    PASS = pass;
+    c.save();
+    if (S.draw) S.draw(c, a.phase, ext); else quad(c, a.phase, ext, S);
+    c.restore();
+  }
+  PASS = 'fill'; BLINK = false;
+  c.restore();
+}
+// ป้ายคำลอยเหนือหัวสัตว์ มีหางชี้ลงที่ตัว — ไม่กลับด้าน จึงอ่านได้เสมอ
+// คำศัพท์: ตัวอักษรใหญ่บนแสงสีนวลฟุ้ง — อยู่บนตัวสัตว์ตัวใหญ่ หรือลอยเหนือหัวสัตว์ตัวเล็ก (ไม่กลับด้าน จึงอ่านได้เสมอ)
+function wordGeom(a, P, minTop = L.hudB + 6){
+  const sp = SP[a.sp], k = a.u * P.sc, fs = (a.onBody ? a.bfs : a.fs) * P.sc;
+  const w = (a.onBody ? a.bw : a.aw) * P.sc, h = fs * 1.35;
+  const cx = a.x + P.ox + a.dir * (a.onBody ? sp.lx : sp.cx) * k;
+  let cy;
+  if (a.onBody) cy = a.y + P.oy + sp.back * 0.78 * k;
+  else { cy = a.y + P.oy * 0.4 - sp.top * k - h * 0.5 - 6; if (cy - h / 2 < minTop) cy = minTop + h / 2; }
+  return { cx, cy, mid: cy, top: cy - h / 2, y1: cy + h / 2, w, h, fs };
+}
+const GLOW = { walk: [255, 251, 238], good: [205, 246, 219], bad: [255, 214, 214] };
+const INKS = { walk: '#24170B', good: '#0E5A30', bad: '#8E1F23' };
+function drawWord(c, a, minTop){
+  const P = pose(a), G = wordGeom(a, P, minTop), [r, g, b] = GLOW[a.state] || GLOW.walk;
+  c.save(); c.globalAlpha = clamp(P.alpha, 0, 1);
+  // แสงฟุ้งรูปวงรีด้านหลังตัวอักษร
+  c.save(); c.translate(G.cx, G.cy); c.scale(G.w * 0.62, G.h * 0.82);
+  const gr = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+  gr.addColorStop(0, `rgba(${r},${g},${b},.96)`); gr.addColorStop(0.55, `rgba(${r},${g},${b},.9)`);
+  gr.addColorStop(0.8, `rgba(${r},${g},${b},.42)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  c.fillStyle = gr; c.beginPath(); c.arc(0, 0, 1, 0, TAU); c.fill();
+  c.restore();
+  c.font = LABEL_FONT(G.fs); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+  c.lineWidth = G.fs * 0.14; c.strokeStyle = `rgba(${r},${g},${b},.95)`; c.strokeText(a.d.w, G.cx, G.cy + G.fs * 0.04);
+  c.fillStyle = INKS[a.state] || INKS.walk; c.fillText(a.d.w, G.cx, G.cy + G.fs * 0.04);
+  if (a.state !== 'walk' && !a.preview){
+    const ok = a.state === 'good', rr = G.fs * 0.3, bx = G.cx + G.w / 2 - rr * 0.4, by = G.top + rr * 0.4;
+    c.beginPath(); c.arc(bx, by, rr, 0, TAU); c.fillStyle = ok ? '#23965A' : '#D6454B'; c.fill();
+    c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.stroke();
+    drawMark(c, bx, by, rr, ok);
+  }
+  c.restore();
+}
+function drawParticles(c, dustOnly){
+  for (const p of particles){
+    if ((p.t === 'dust') !== dustOnly) continue;
+    const k = 1 - p.life / p.max;
+    if (p.t === 'dust'){ c.fillStyle = p.col + (0.5 * k).toFixed(3) + ')'; c.beginPath(); c.arc(p.x, p.y, p.size * (1.4 - k * 0.6), 0, TAU); c.fill(); }
+    else if (p.t === 'star'){ c.globalAlpha = k; c.fillStyle = p.col; starPath(c, p.x, p.y, p.size, p.rot); c.fill(); c.globalAlpha = 1; }
+    else if (p.t === 'ring'){ c.globalAlpha = k; c.strokeStyle = p.col; c.lineWidth = 4 * k + 1; c.beginPath(); c.arc(p.x, p.y, p.size * (1.6 - k), 0, TAU); c.stroke(); c.globalAlpha = 1; }
+    else { c.save(); c.globalAlpha = Math.min(1, k * 1.5); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.col;
+      c.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * (p.t === 'conf' ? 0.55 : 0.7)); c.restore(); }
+  }
+}
+function starPath(c, x, y, r, rot){
+  c.beginPath();
+  for (let i = 0; i < 10; i++){ const rad = i % 2 ? r * 0.45 : r, ang = rot + i * Math.PI / 5 - Math.PI / 2; c.lineTo(x + Math.cos(ang) * rad, y + Math.sin(ang) * rad); }
+  c.closePath();
+}
+function draw(){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.drawImage(bg, 0, 0, W, H);
+  drawClouds(ctx);
+  const list = animals.slice().sort((a, b) => a.y - b.y || a.id - b.id);
+  drawParticles(ctx, true);
+  for (const a of list) drawAnimal(ctx, a);
+  for (const a of list) drawWord(ctx, a);
+  drawParticles(ctx, false);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  for (const f of floats){
+    const k = f.life / f.max;
+    ctx.globalAlpha = 1 - Math.max(0, (k - 0.6) / 0.4);
+    ctx.font = `700 ${f.size * (k < 0.15 ? 0.7 + k * 2 : 1)}px Mali, sans-serif`;
+    ctx.lineWidth = 7; ctx.strokeStyle = '#fff'; ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.col; ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+  if (banner){
+    const k = banner.life / banner.max, s = k < 0.2 ? 0.5 + k * 2.5 : 1;
+    ctx.save(); ctx.globalAlpha = k > 0.75 ? (1 - k) / 0.25 : 1; ctx.translate(W / 2, (L.hudB + H) / 2 - H * 0.06); ctx.scale(s, s);
+    ctx.font = `700 ${clamp(W * 0.11, 36, 76)}px Mali, sans-serif`;
+    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillText(banner.text, 0, 5);
+    ctx.lineWidth = 11; ctx.strokeStyle = '#fff'; ctx.strokeText(banner.text, 0, 0);
+    ctx.fillStyle = banner.col; ctx.fillText(banner.text, 0, 0); ctx.restore();
+  }
+  if (state === 'menu') drawPreview();
+}
+
+/* =====================================================
+   11) การจิ้มสัตว์ (Pointer Events)
+   ===================================================== */
+function hitTest(px, py){
+  let labelHit = null, bodyHit = null;
+  for (const a of animals){
+    if (a.state !== 'walk') continue;
+    const sp = SP[a.sp], P = pose(a), G = wordGeom(a, P), pad = Math.max(12, 30 - sp.hw * a.u * 0.2);
+    if (Math.abs(px - G.cx) <= G.w / 2 + 8 && py >= G.top - 8 && py <= G.y1){
+      if (!labelHit || a.y > labelHit.y) labelHit = a;
+    }
+    const bx = a.x + a.dir * sp.cx * a.u, hw = sp.hw * a.u + pad, top = a.y + P.oy - sp.top * a.u - pad;
+    if (px >= bx - hw && px <= bx + hw && py >= top && py <= a.y + pad){
+      if (!bodyHit || a.y > bodyHit.y || (a.y === bodyHit.y && Math.abs(px - bx) < Math.abs(px - bodyHit.x))) bodyHit = a;
+    }
+  }
+  return labelHit || bodyHit;
+}
+function tapAnimal(a){
+  if (a.state !== 'walk' || a.answered) return;
+  a.answered = true; a.st = 0;
+  const G = wordGeom(a, pose(a)), cx = G.cx, cy = G.mid, fsz = clamp(L.fontBase * 1.05, 28, 56);
+  if (a.d.k){
+    a.state = 'good'; score += 10; good++; combo++;
+    log.correct.push(a.d);
+    stars(cx, cy, 18, clamp(a.u * 7, 6, 14)); dust(a.x, a.y, 5, clamp(a.u * 5, 3, 8));
+    floatText(cx, G.top - fsz * 0.6, '+10', '#1E8A4E', fsz);
+    showToast('เก่งมาก! ถูกต้อง +10', 'good', 'check'); sfx.good();
+    if (combo > 0 && combo % 5 === 0){
+      setTimeout(() => { if (state === 'playing'){ showToast(`ต่อเนื่อง ${combo} ครั้ง!`, 'info', 'fire'); sfx.combo(); confetti(40); } }, 350);
+    }
+  } else {
+    a.state = 'bad'; score = Math.max(0, score - 10); bad++; combo = 0;
+    log.wrong.push(a.d);
+    shards(cx, cy, 14, clamp(a.u * 7, 6, 14));
+    floatText(cx, G.top - fsz * 0.6, '−10', '#C8343A', fsz);
+    showToast('ผิด! ไม่ใช่แม่เกย −10', 'bad', 'cross'); sfx.bad();
+  }
+  updateHUD();
+}
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (state !== 'playing') return;
+  const r = canvas.getBoundingClientRect();
+  const a = hitTest(e.clientX - r.left, e.clientY - r.top);
+  if (a) tapAnimal(a);
+}, { passive: false });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('touchmove', e => { if (e.target === canvas) e.preventDefault(); }, { passive: false });
+
+/* =====================================================
+   12) Game flow
+   ===================================================== */
+function resetRound(){
+  animals = []; particles.length = 0; floats = []; banner = null;
+  score = 0; good = 0; bad = 0; passed = 0; combo = 0; timeLeft = GAME_TIME; elapsed = 0;
+  spawnT = 0; stepT = 0.3; lastWarn = 99;
+  log = { correct: [], wrong: [], missed: [], passedNot: 0 };
+  lastType = null; streak = 0; recent = []; countK = 0; countN = 0;
+  $('timeBox').classList.remove('warn');
+}
+function startGame(){
+  initAudio(); hideAll(); resetRound();
+  state = 'playing';
+  banner = { text: 'เริ่ม!', col: '#2E8B57', life: 0, max: 1.1 };
+  sfx.start();
+  spawnAnimal(false); spawnT = diffNow().interval;
+  $('btnPause').disabled = false; $('btnPause').innerHTML = I('pause');
+  updateHUD();
+}
+function pauseGame(){
+  if (state !== 'playing') return;
+  state = 'paused';
+  $('pauseInfo').textContent = `โหมด${DIFF[diff].name} · เหลือเวลา ${Math.ceil(timeLeft)} วินาที`;
+  show('ovPause'); $('btnPause').innerHTML = I('play');
+}
+function resumeGame(){
+  if (state !== 'paused') return;
+  initAudio(); hideAll(); state = 'playing'; $('btnPause').innerHTML = I('pause');
+}
+function goHome(){
+  hideAll(); resetRound(); state = 'menu'; demoT = 0;
+  $('btnPause').disabled = true; $('btnPause').innerHTML = I('pause');
+  updateHUD(); refreshMenu(); show('ovStart');
+}
+function endGame(){
+  state = 'over'; timeLeft = 0;
+  $('btnPause').disabled = true; $('btnPause').innerHTML = I('pause');
+  $('timeBox').classList.remove('warn');
+  const isNew = score > best && score > 0;
+  if (score > best){ best = score; store(KEY_BEST, String(best)); }
+  updateHUD();
+  banner = { text: 'หมดเวลา!', col: '#3A8FD0', life: 0, max: 1.2 };
+  sfx.end();
+  const acc = good + bad ? good / (good + bad) * 100 : 0;
+  if (isNew || (good >= 8 && acc >= 80)) confetti(90);
+  setTimeout(() => { if (state === 'over') showResult(isNew); }, 900);
+}
+
+/* =====================================================
+   13) HUD / UI
+   ===================================================== */
+let shownScore = -1;
+function updateHUD(){
+  if (score !== shownScore){
+    const box = $('scoreBox');
+    if (shownScore >= 0){ box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump'); }
+    shownScore = score; $('sScore').textContent = score;
+  }
+  $('sTime').textContent = Math.ceil(timeLeft);
+  $('progBar').style.width = (timeLeft / GAME_TIME * 100).toFixed(1) + '%';
+  $('sGood').textContent = good; $('sBad').textContent = bad; $('sBest').textContent = best;
+}
+function show(id){ $(id).classList.add('show'); }
+function hide(id){ $(id).classList.remove('show'); }
+function hideAll(){ document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show')); }
+function refreshMenu(){
+  $('bestStart').textContent = best;
+  document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.diff === diff)));
+}
+function groupWords(list){
+  const m = new Map();
+  for (const d of list){ const e = m.get(d.w) || { d, n: 0 }; e.n++; m.set(d.w, e); }
+  return [...m.values()];
+}
+function countUp(el, to){
+  const t0 = performance.now();
+  const step = t => { const p = Math.min(1, (t - t0) / 900); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function showResult(isNew){
+  const acc = good + bad ? Math.round(good / (good + bad) * 100) : 0;
+  let starsN = 0;
+  if (good >= 10 && acc >= 85) starsN = 3; else if (good >= 5 && acc >= 65) starsN = 2; else if (good >= 1) starsN = 1;
+  let msg;
+  if (good + bad === 0) msg = 'ลองจิ้มสัตว์ที่มีคำแม่เกยดูนะ สู้ ๆ!';
+  else if (acc >= 90 && good >= 10) msg = 'สุดยอด! เป็นแชมป์แม่เกยตัวจริง ' + I('trophy');
+  else if (acc >= 75) msg = 'เก่งมาก! แยกคำแม่เกยได้ดีเยี่ยม ' + I('star');
+  else if (acc >= 50) msg = 'ดีมาก! ฝึกอีกนิดจะเก่งขึ้นอีก';
+  else msg = 'ไม่เป็นไรนะ ลองฟังเสียงท้ายคำว่าเป็น /ย/ หรือไม่ แล้วเล่นใหม่อีกครั้ง';
+
+  const wrong = groupWords(log.wrong), right = groupWords(log.correct), missed = groupWords(log.missed);
+  const times = n => n > 1 ? `<span class="tag o">×${n}</span>` : '';
+  const card = (e, tags) => `<div class="rv"><span class="w">${e.d.w}</span><div class="info">${tags}${times(e.n)}<div>${I('bulb')} ${explain(e.d)}</div></div></div>`;
+  const empty = t => `<p class="empty">${t}</p>`;
+
+  $('resultBody').innerHTML = `
+    <div class="stars">${[0,1,2].map(i => `<span class="${i < starsN ? 'on' : ''}" style="--d:${0.25 + i * 0.22}s">${I('star')}</span>`).join('')}</div>
+    <div class="final" id="finalScore">0</div>
+    <div class="final-l">คะแนน · โหมด${I(DIFF[diff].icon)}<b>${DIFF[diff].name}</b></div>
+    ${isNew ? `<div class="newbest">${I('party')}สถิติใหม่!</div>` : ''}
+    <div class="stats">
+      <div class="stat"><b style="color:var(--good)">${good}</b><small>ตอบถูก</small></div>
+      <div class="stat"><b style="color:var(--bad)">${bad}</b><small>ตอบผิด</small></div>
+      <div class="stat"><b>${acc}%</b><small>ความแม่นยำ</small></div>
+    </div>
+    <div class="sub-stats"><span>ปล่อยผ่าน <b>${passed}</b></span><span>พลาดโอกาสตอบถูก <b>${log.missed.length}</b></span><span>สูงสุด <b>${best}</b></span></div>
+    <div class="msg">${msg}</div>
+    <div class="row">
+      <button class="btn primary" id="btnAgain">${I('restart-w')}เล่นอีกครั้ง</button>
+      <button class="btn ghost" id="btnHome">${I('home')}หน้าหลัก</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab t-wrong" data-tab="wrong" role="tab">ตอบผิด<span class="c">${log.wrong.length}</span></button>
+      <button class="tab t-right" data-tab="right" role="tab">ตอบถูก<span class="c">${log.correct.length}</span></button>
+      <button class="tab t-miss" data-tab="miss" role="tab">พลาด<span class="c">${log.missed.length}</span></button>
+    </div>
+    <div class="pane" data-pane="wrong">${wrong.length ? wrong.map(e => card(e, '<span class="tag r">ไม่ใช่แม่เกย</span><span class="tag o">คุณจิ้ม</span>')).join('') : empty('ไม่มีคำที่จิ้มผิดเลย เยี่ยมมาก!')}</div>
+    <div class="pane" data-pane="right">${right.length ? right.map(e => card(e, '<span class="tag g">แม่เกย</span><span class="tag g">จิ้มถูกต้อง</span>')).join('') : empty('ยังไม่มีคำที่ตอบถูก ลองใหม่อีกครั้งนะ')}</div>
+    <div class="pane" data-pane="miss">${missed.length ? missed.map(e => card(e, '<span class="tag g">แม่เกย</span><span class="tag o">ปล่อยผ่าน (ไม่นับว่าผิด)</span>')).join('') : empty('ไม่พลาดคำแม่เกยเลย ตาไวมาก!')}</div>
+    <p class="foot">ปล่อยสัตว์ที่ไม่ใช่แม่เกยผ่านไปอย่างถูกต้อง ${log.passedNot} ตัว</p>`;
+  const setTab = name => {
+    document.querySelectorAll('#resultBody .tab').forEach(t => { const on = t.dataset.tab === name; t.classList.toggle('on', on); t.setAttribute('aria-selected', String(on)); });
+    document.querySelectorAll('#resultBody .pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
+  };
+  document.querySelectorAll('#resultBody .tab').forEach(t => t.onclick = () => { sfx.click(); setTab(t.dataset.tab); });
+  setTab(log.wrong.length ? 'wrong' : log.correct.length ? 'right' : 'miss');
+  $('btnAgain').onclick = startGame;
+  $('btnHome').onclick = goHome;
+  $('resultPanel').scrollTop = 0;
+  show('ovResult');
+  countUp($('finalScore'), score);
+  for (let i = 0; i < starsN; i++) setTimeout(() => sfx.star(i), 250 + i * 220);
+}
+
+/* =====================================================
+   14) ภาพตัวอย่างบนหน้าเริ่มเกม
+   ===================================================== */
+const pv = $('preview'), pctx = pv.getContext('2d');
+let PW = 0, PH = 0;
+function sizePreview(){
+  const r = pv.getBoundingClientRect(); if (!r.width) return;
+  PW = r.width; PH = r.height; pv.width = Math.round(PW * DPR); pv.height = Math.round(PH * DPR);
+}
+const demoA = [
+  { id: 1, sp: 'zebra', d: { w: 'สวย', k: 1 }, dir: 1, state: 'walk', alpha: 1, st: 0, trim: '#3E6FB0', preview: true, ok: true },
+  { id: 2, sp: 'panda', d: { w: 'นก', k: 0 }, dir: -1, state: 'walk', alpha: 1, st: 0, trim: '#C28E2C', preview: true, ok: false }
+];
+function drawPreview(){
+  if (!$('ovStart').classList.contains('show')) return;
+  if (!PW) sizePreview(); if (!PW) return;
+  const c = pctx; c.setTransform(DPR, 0, 0, DPR, 0, 0); c.clearRect(0, 0, PW, PH);
+  let g = c.createLinearGradient(0, 0, 0, PH * 0.55); g.addColorStop(0, '#4FB3F2'); g.addColorStop(1, '#D3F1FF');
+  c.fillStyle = g; c.fillRect(0, 0, PW, PH);
+  c.fillStyle = '#8FD95F'; c.fillRect(0, PH * 0.5, PW, PH);
+  g = c.createLinearGradient(0, PH * 0.7, 0, PH); g.addColorStop(0, '#FBE7B8'); g.addColorStop(1, '#F2CF8E');
+  c.fillStyle = g; c.beginPath(); c.moveTo(0, PH * 0.72);
+  for (let x = 0; x <= PW + 10; x += 10) c.lineTo(x, PH * 0.72 + Math.sin(x * 0.03) * 2);
+  c.lineTo(PW, PH); c.lineTo(0, PH); c.closePath(); c.fill();
+  const fs = clamp(PH * 0.16, 20, 28), k = Math.min((PH - 24) / SP.zebra.rel, PW / 3.3);
+  demoA.forEach((a, i) => {
+    const sp = SP[a.sp];
+    a.kk = 1; sizeAnimal(a, k, fs);
+    a.x = PW * (i ? 0.76 : 0.32) + Math.sin(globalT * 1.2 + i) * 4; a.y = PH - 10;
+    a.phase = globalT * 3.2 + i * 2;
+    drawAnimal(c, a); drawWord(c, a, 4);
+    const G = wordGeom(a, pose(a), 4), r = 12, bx = clamp(G.cx + (i ? 1 : -1) * (G.w / 2 + r + 2), r + 4, PW - r - 4), by = G.mid;
+    c.beginPath(); c.arc(bx, by, r + 2.5, 0, TAU); c.fillStyle = '#fff'; c.fill();
+    c.beginPath(); c.arc(bx, by, r, 0, TAU); c.fillStyle = a.ok ? '#23965A' : '#D6454B'; c.fill();
+    drawMark(c, bx, by, r, a.ok);
+    c.font = '700 13px Mali, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top';
+    c.lineWidth = 4; c.strokeStyle = 'rgba(255,255,255,.95)'; c.lineJoin = 'round';
+    const t = a.ok ? 'จิ้มเลย' : 'ปล่อยผ่าน';
+    c.strokeText(t, bx, by + r + 5); c.fillStyle = a.ok ? '#14653A' : '#A8262B'; c.fillText(t, bx, by + r + 5);
+  });
+}
+
+/* =====================================================
+   15) ปุ่มต่าง ๆ
+   ===================================================== */
+$('btnStart').onclick = startGame;
+$('btnHow').onclick = () => { initAudio(); sfx.click(); show('ovHow'); };
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => { sfx.click(); hide(b.dataset.close); });
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { initAudio(); diff = b.dataset.diff; store(KEY_DIFF, diff); sfx.click(); refreshMenu(); });
+document.querySelectorAll('[data-sound]').forEach(b => b.onclick = () => { initAudio(); setMuted(!muted); sfx.click(); });
+$('btnPause').onclick = () => { if (state === 'playing') pauseGame(); else if (state === 'paused') resumeGame(); };
+$('btnResume').onclick = resumeGame;
+$('btnPauseRestart').onclick = startGame;
+$('btnPauseHome').onclick = goHome;
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') pauseGame(); });
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'KeyP' || e.code === 'Escape'){
+    if (state === 'playing'){ e.preventDefault(); pauseGame(); } else if (state === 'paused'){ e.preventDefault(); resumeGame(); }
+  }
+});
+
+/* =====================================================
+   16) Main loop
+   ===================================================== */
+let lastTs = 0;
+function frame(ts){
+  const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.05) : 0;
+  lastTs = ts;
+  if (state !== 'paused') update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+let resizeTimer = null;
+const queueResize = () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 80); };
+window.addEventListener('resize', queueResize);
+if (window.ResizeObserver){ const ro = new ResizeObserver(queueResize); ro.observe(stage); ro.observe($('hud')); }
+if (document.fonts && document.fonts.load){
+  Promise.all(['800 32px Sarabun', '700 32px Mali', '400 16px Mali'].map(f => document.fonts.load(f).catch(() => null))).then(() => resize());
+  document.fonts.ready.then(() => resize());
+}
+
+setMuted(muted);
+resize(); refreshMenu(); updateHUD();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
